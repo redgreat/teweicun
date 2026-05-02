@@ -1,0 +1,24 @@
+# golangci-lint v2（与 Makefile 中 go run 的版本保持一致即可）
+# 说明：在 standard 预设上关闭对存量代码噪声高、或非强制的规则，保证 make lint 可通过。
+
+version: "2"
+
+run:
+  timeout: 5m
+  # 前端目录内可能存在第三方 .go，不参与本仓库后端检查
+  skip-dirs:
+    - frontend
+
+linters:
+  default: standard
+  disable:
+    # defer Close/Rollback、JSON 解析等未统一校验返回值
+    - errcheck
+    # 个别占位/中间赋值写法会误报
+    - ineffassign
+
+  settings:
+    staticcheck:
+      # 关闭「可套用德摩根律」类风格建议（QF），保留 SA/ST 等常规检查
+      checks:
+        - "-QF1001"

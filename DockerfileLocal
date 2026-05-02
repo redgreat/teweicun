@@ -1,0 +1,25 @@
+# Build stage
+FROM golang:1.25-alpine AS builder
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go env -w GOPROXY=https://goproxy.cn,direct
+RUN go mod download -x
+
+COPY cmd ./cmd
+COPY internal ./internal
+COPY pkg ./pkg
+COPY configs ./configs
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server
+
+# Production stage
+FROM alpine:latest
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
+RUN apk add --no-cache tzdata ca-certificates && \
+    mkdir -p /var/log/teweicun
+WORKDIR /app
+COPY --from=builder /app/main .
+COPY --from=builder /app/configs ./configs
+
+EXPOSE 8080
+CMD ["./main"]

@@ -1,0 +1,43 @@
+/**
+ * 功能：inventory.go
+ * 创建时间：2026-04-18
+ * 创建人：wangcw
+ */
+
+package service
+
+import (
+	"context"
+
+	"github.com/redgreat/teweicun/internal/db"
+	"github.com/redgreat/teweicun/internal/dto/request"
+	"github.com/redgreat/teweicun/internal/dto/response"
+)
+
+func ListInventoryDetail(ctx context.Context, q *request.InventoryQuery) ([]response.InventoryDetailResp, int64, error) {
+	return db.ListInventoryDetail(ctx, q)
+}
+
+func ListInventorySummary(ctx context.Context, q *request.InventoryQuery) ([]response.InventorySummaryResp, int64, error) {
+	return db.ListInventorySummary(ctx, q)
+}
+
+func ListInventoryAvailable(ctx context.Context, q *request.InventoryAvailableQuery) ([]response.InventoryAvailableResp, int64, error) {
+	return db.ListInventoryAvailable(ctx, q)
+}
+
+func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) ([]response.InventoryIssuedResp, int64, error) {
+	return db.ListInventoryIssued(ctx, q)
+}
+
+func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, int64, *response.InventorySKULedgerStatsResp, error) {
+	return db.ListInventorySKULedger(ctx, q)
+}
+
+func ListInventorySKUSerials(ctx context.Context, q *request.InventorySKUSerialQuery) ([]response.InventorySKUSerialResp, error) {
+	return db.ListInventorySKUSerials(ctx, q)
+}
+
+func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, *response.InventorySKULedgerStatsResp, error) {
+	return db.ExportInventorySKULedger(ctx, q)
+}

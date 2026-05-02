@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+@plugin 'daisyui';
+
+:root {
+	--glass-bg: rgba(255, 255, 255, 0.1);
+	--glass-blur: blur(12px);
+}
+
+@layer base {
+	body {
+		@apply bg-base-200 text-base-content h-screen overflow-hidden;
+	}
+}
+
+.glass-card {
+	background: var(--glass-bg);
+	backdrop-filter: var(--glass-blur);
+	-webkit-backdrop-filter: var(--glass-blur);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}

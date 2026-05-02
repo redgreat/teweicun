@@ -1,0 +1,35 @@
+server:
+  port: 8080
+  mode: release
+
+database:
+  host: eadm-wangcw.h.aivencloud.com
+  port: 25909
+  user: twc
+  password: Rwang2026
+  dbname: teweicun
+  sslmode: require
+  timezone: Asia/Shanghai
+  pool_max_conns: 10
+  pool_min_conns: 2
+
+redis:
+  host: redis-10160.crce178.ap-east-1-1.ec2.cloud.redislabs.com
+  port: 10160
+  password: ILBxBjgNkpnO8EE7MmSvSbU0K2CtMmGi
+  db: 0
+
+jwt:
+  secret: uctnuuhhRBuRUy2DBFzY3xBCu3245Hpf
+  expire_hours: 24
+
+storage:
+  type: local 
+  local_path: ./uploads
+
+log:
+  level: info
+  filename: /var/log/teweicun/teweicun.log
+  max_size: 100
+  max_backups: 30
+  max_age: 90
