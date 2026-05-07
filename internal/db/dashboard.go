@@ -140,19 +140,18 @@ func QueryDashboardBigscreen(ctx context.Context, rangeKey string) (*response.Da
 			poi.material_id,
 			COALESCE(m.material_code, ''),
 			COALESCE(m.material_name, ''),
-			COALESCE(poi.sku_id, 0),
-			COALESCE(ms.sku_code, ''),
-			COALESCE(ms.sku_name, ''),
+			0::bigint AS sku_id,
+			''::varchar AS sku_code,
+			''::varchar AS sku_name,
 			COALESCE(SUM(poi.quantity), 0)::float8,
 			COALESCE(SUM(COALESCE(poi.amount, poi.quantity * poi.unit_price)), 0)::float8
 		FROM purchase_order po
 		INNER JOIN purchase_order_item poi ON poi.order_id = po.id
 		LEFT JOIN material m ON m.id = poi.material_id
-		LEFT JOIN material_sku ms ON ms.id = poi.sku_id
 		WHERE po.deleted_at IS NULL
 		  AND po.order_status <> 'draft'
 		  AND po.order_date::date >= $1::date
-		GROUP BY poi.material_id, m.material_code, m.material_name, poi.sku_id, ms.sku_code, ms.sku_name
+		GROUP BY poi.material_id, m.material_code, m.material_name
 		ORDER BY SUM(COALESCE(poi.amount, poi.quantity * poi.unit_price)) DESC
 		LIMIT 8
 	`
@@ -165,20 +164,19 @@ func QueryDashboardBigscreen(ctx context.Context, rangeKey string) (*response.Da
 			coi.material_id,
 			COALESCE(m.material_code, ''),
 			COALESCE(m.material_name, ''),
-			COALESCE(inv.sku_id, 0),
-			COALESCE(ms.sku_code, ''),
-			COALESCE(ms.sku_name, ''),
+			0::bigint AS sku_id,
+			''::varchar AS sku_code,
+			''::varchar AS sku_name,
 			COALESCE(SUM(coi.quantity), 0)::float8,
 			COALESCE(SUM(coi.quantity * COALESCE(inv.unit_cost, 0)), 0)::float8
 		FROM consumption_order co
 		INNER JOIN consumption_order_item coi ON coi.order_id = co.id
 		LEFT JOIN inventory inv ON inv.id = coi.inventory_id
 		LEFT JOIN material m ON m.id = coi.material_id
-		LEFT JOIN material_sku ms ON ms.id = inv.sku_id
 		WHERE co.deleted_at IS NULL
 		  AND co.status IN ('confirmed', 'completed')
 		  AND co.order_date::date >= $1::date
-		GROUP BY coi.material_id, m.material_code, m.material_name, inv.sku_id, ms.sku_code, ms.sku_name
+		GROUP BY coi.material_id, m.material_code, m.material_name
 		ORDER BY SUM(coi.quantity * COALESCE(inv.unit_cost, 0)) DESC
 		LIMIT 8
 	`
@@ -191,20 +189,19 @@ func QueryDashboardBigscreen(ctx context.Context, rangeKey string) (*response.Da
 			coi.material_id,
 			COALESCE(m.material_code, ''),
 			COALESCE(m.material_name, ''),
-			COALESCE(inv.sku_id, 0),
-			COALESCE(ms.sku_code, ''),
-			COALESCE(ms.sku_name, ''),
+			0::bigint AS sku_id,
+			''::varchar AS sku_code,
+			''::varchar AS sku_name,
 			COALESCE(SUM(coi.quantity), 0)::float8,
 			COALESCE(SUM(coi.quantity * COALESCE(inv.unit_cost, 0)), 0)::float8
 		FROM consumption_order co
 		INNER JOIN consumption_order_item coi ON coi.order_id = co.id
 		LEFT JOIN inventory inv ON inv.id = coi.inventory_id
 		LEFT JOIN material m ON m.id = coi.material_id
-		LEFT JOIN material_sku ms ON ms.id = inv.sku_id
 		WHERE co.deleted_at IS NULL
 		  AND co.status IN ('confirmed', 'completed')
 		  AND co.order_date::date >= $1::date
-		GROUP BY coi.material_id, m.material_code, m.material_name, inv.sku_id, ms.sku_code, ms.sku_name
+		GROUP BY coi.material_id, m.material_code, m.material_name
 		ORDER BY SUM(coi.quantity) DESC
 		LIMIT 8
 	`
@@ -239,14 +236,7 @@ func QueryDashboardBigscreen(ctx context.Context, rangeKey string) (*response.Da
 			  AND co.order_date::date >= $1::date
 		),
 		active_sku AS (
-			SELECT COALESCE(COUNT(DISTINCT inv.sku_id), 0)::int8 AS cnt
-			FROM consumption_order co
-			INNER JOIN consumption_order_item coi ON coi.order_id = co.id
-			LEFT JOIN inventory inv ON inv.id = coi.inventory_id
-			WHERE co.deleted_at IS NULL
-			  AND co.status IN ('confirmed', 'completed')
-			  AND co.order_date::date >= $1::date
-			  AND inv.sku_id IS NOT NULL
+			SELECT 0::int8 AS cnt
 		),
 		max_single AS (
 			SELECT COALESCE(MAX(t.amount), 0)::float8 AS amount
@@ -313,4 +303,3 @@ func ValidateDashboardRange(rangeKey string) error {
 		return fmt.Errorf("invalid range")
 	}
 }
-

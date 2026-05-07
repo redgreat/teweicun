@@ -28,20 +28,24 @@ type InventoryIssuedQuery struct {
 	Q             string `form:"q"`
 }
 
-type InventorySKULedgerQuery struct {
+type InventoryMaterialLedgerQuery struct {
 	PageQuery
+	MaterialName  string  `form:"material_name"`
 	SKUName       string  `form:"sku_name"`
 	WarehouseName string  `form:"warehouse_name"`
 	PriceMin      float64 `form:"price_min"`
 	PriceMax      float64 `form:"price_max"`
 }
 
-type InventorySKUSerialQuery struct {
+type InventoryMaterialLedgerSerialQuery struct {
 	MaterialID  int64   `form:"material_id" binding:"required,gt=0"`
 	WarehouseID int64   `form:"warehouse_id" binding:"required,gt=0"`
 	SKUID       int64   `form:"sku_id"`
 	UnitCost    float64 `form:"unit_cost"`
 }
+
+type InventorySKULedgerQuery = InventoryMaterialLedgerQuery
+type InventorySKUSerialQuery = InventoryMaterialLedgerSerialQuery
 
 type StockOutQuery struct {
 	PageQuery

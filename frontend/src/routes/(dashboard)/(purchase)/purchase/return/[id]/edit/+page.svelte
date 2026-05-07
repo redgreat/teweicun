@@ -9,7 +9,6 @@
 	import { page } from '$app/stores';
 	import { ArrowLeft, Plus, Trash2, RotateCcw } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
-	import SkuAttrViewer from '$lib/components/SkuAttrViewer.svelte';
 	import { formatDateInCn, todayDateInCn } from '$lib/datetime';
 
 	let suppliers = $state<any[]>([]);
@@ -38,8 +37,6 @@
 	});
 
 	let submitting = $state(false);
-	let skuAttrViewer: any = $state(null);
-
 	async function loadSuppliers() {
 		try {
 			const res: any = await api.get('/base/suppliers?page=1&page_size=100');
@@ -71,12 +68,11 @@
 	}
 
 	function buildInvOptionLabel(inv: any) {
-		const skuName = inv?.sku_name || inv?.material_name || '';
-		const skuCode = inv?.sku_code || '';
-		const matCode = inv?.material_code || '';
+		const matName = inv?.material_name || inv?.sku_name || '';
+		const matCode = inv?.material_code || inv?.sku_code || '';
 		const wh = inv?.warehouse_name || inv?.warehouse_code || '';
 		const available = inv?.available_quantity ?? inv?.available ?? '';
-		const base = skuName && skuCode ? `${skuName} [${skuCode}]` : skuName || skuCode || '';
+		const base = matName && matCode ? `${matName} [${matCode}]` : matName || matCode || '';
 		return `${base} | ${matCode} | 仓库:${wh} | 可用:${available}`;
 	}
 
@@ -182,7 +178,7 @@
 		}
 		invDropdownOpenRow = index;
 		invDropdownAnchor = anchor;
-		invSearchTerm = normalizeInvSearchTerm(form.items[index]?.sku_label || '');
+		invSearchTerm = normalizeInvSearchTerm(form.items[index]?.material_label || '');
 		invOptions = [];
 		invOptionsTotal = 0;
 		invOptionsPage = 1;
@@ -201,19 +197,18 @@
 	function selectInv(index: number, inv: any) {
 		const maxQty = Number(inv.available_quantity ?? 0);
 		form.items[index].inventory_id = Number(inv.inventory_id || 0);
-		form.items[index].sku_id = Number(inv.sku_id || 0);
 		form.items[index].material_id = Number(inv.material_id || 0);
 		form.items[index].unit = String(inv.unit || '').trim() || '件';
 		form.items[index].unit_cost = Number(inv.unit_cost ?? 0);
 		form.items[index].max_quantity = maxQty;
-		form.items[index].sku_label = buildInvOptionLabel(inv);
+		form.items[index].material_label = buildInvOptionLabel(inv);
 		form.items[index].quantity = maxQty > 0 ? maxQty : 1;
 		closeInvDropdown();
 	}
 
 	function onInvInput(index: number) {
 		if (invDropdownOpenRow !== index) return;
-		const val = form.items[index]?.sku_label || '';
+		const val = form.items[index]?.material_label || '';
 		invSearchTerm = normalizeInvSearchTerm(val);
 		if (invSearchTimeout) clearTimeout(invSearchTimeout);
 		invSearchTimeout = setTimeout(() => {
@@ -238,9 +233,8 @@
 	function addItem() {
 		form.items.push({
 			inventory_id: 0,
-			sku_id: 0,
 			material_id: 0,
-			sku_label: '',
+			material_label: '',
 			quantity: 1,
 			unit: '',
 			unit_cost: 0,
@@ -250,14 +244,6 @@
 
 	function removeItem(index: number) {
 		form.items.splice(index, 1);
-	}
-
-	function viewAttrs(item: any) {
-		if (!item?.sku_id || !skuAttrViewer?.open) return;
-		skuAttrViewer.open({
-			skuId: Number(item.sku_id || 0),
-			title: item.sku_label || 'SKU属性'
-		});
 	}
 
 	function lineFromDetailItem(it: any) {
@@ -272,9 +258,8 @@
 		};
 		return {
 			inventory_id: Number(it.inventory_id || 0),
-			sku_id: Number(it.sku_id || 0),
 			material_id: Number(it.material_id || 0),
-			sku_label: buildInvOptionLabel(invLike),
+			material_label: buildInvOptionLabel(invLike),
 			quantity: Number(it.quantity || 0),
 			unit: String(it.unit || '').trim() || '件',
 			unit_cost: Number(it.unit_cost ?? 0),
@@ -339,7 +324,7 @@
 		}
 		for (const item of form.items) {
 			if (!item.inventory_id) {
-				toast.error('退货明细必须选择在库 SKU');
+				toast.error('退货明细必须选择在库物料');
 				return;
 			}
 			const qty = Number(item.quantity || 0);
@@ -474,7 +459,7 @@
 							<thead>
 								<tr>
 									<th class="w-10">#</th>
-									<th class="min-w-[320px] lg:min-w-[420px]">SKU名称</th>
+									<th class="min-w-[320px] lg:min-w-[420px]">物料名称</th>
 									<th class="w-24">属性</th>
 									<th class="min-w-[72px] text-right">可用</th>
 									<th class="min-w-[120px]">退货数量</th>
@@ -496,23 +481,16 @@
 											>
 												<input
 													type="text"
-													bind:value={item.sku_label}
+													bind:value={item.material_label}
 													class="input input-bordered bg-base-200/50 h-10 w-full min-w-[280px] text-base"
-													placeholder="搜索在库 SKU 名称、物料或编码…"
+													placeholder="搜索在库物料名称或编码…"
 													onfocus={(e) => openInvDropdown(i, e.currentTarget as HTMLInputElement)}
 													oninput={() => onInvInput(i)}
 												/>
 											</div>
 										</td>
 										<td>
-											<button
-												type="button"
-												class="btn btn-xs btn-ghost text-base"
-												onclick={() => viewAttrs(item)}
-												disabled={!item.sku_id}
-											>
-												查看
-											</button>
+											<span class="text-sm">{(item.custom_attributes || []).length}项</span>
 										</td>
 										<td class="text-right text-base tabular-nums">
 											{item.inventory_id ? item.max_quantity : '—'}
@@ -588,8 +566,6 @@
 	</div>
 </div>
 
-<SkuAttrViewer bind:this={skuAttrViewer} />
-
 {#if invDropdownOpenRow !== null}
 	<div class="fixed inset-0 z-[70]" role="presentation" onclick={closeInvDropdown}></div>
 	<div
@@ -618,7 +594,7 @@
 						class="hover:bg-base-200/60 border-base-200 w-full border-b px-3 py-2.5 text-left last:border-b-0"
 						onclick={() => selectInv(invDropdownOpenRow as number, invOpt)}
 					>
-						<div class="text-sm font-medium">{invOpt.sku_name || invOpt.material_name || '-'}</div>
+						<div class="text-sm font-medium">{invOpt.material_name || invOpt.sku_name || '-'}</div>
 						<div class="text-base-content/60 font-mono text-xs">{buildInvOptionLabel(invOpt)}</div>
 					</button>
 				{/each}

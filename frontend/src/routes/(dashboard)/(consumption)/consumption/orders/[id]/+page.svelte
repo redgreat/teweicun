@@ -3,13 +3,11 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import SkuAttrViewer from '$lib/components/SkuAttrViewer.svelte';
 	import { ArrowLeft, FileText, Calendar, BadgeCheck, ClipboardList } from 'lucide-svelte';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
 	let loading = $state(true);
 	let order = $state<any | null>(null);
-	let skuAttrViewer: any = $state(null);
 
 	function formatMoney(n: number) {
 		const x = Number(n) || 0;
@@ -24,15 +22,6 @@
 		let s = 0;
 		for (const it of order?.items || []) s += lineAmount(it);
 		return s;
-	}
-
-	function viewAttrs(it: any) {
-		if (!it?.sku_id || !skuAttrViewer?.open) return;
-		const title = [it.sku_name, it.sku_code ? `[${it.sku_code}]` : '']
-			.filter(Boolean)
-			.join(' ')
-			.trim();
-		skuAttrViewer.open({ skuId: Number(it.sku_id || 0), title: title || 'SKU属性' });
 	}
 
 	function formatDate(dateStr: string) {
@@ -246,27 +235,14 @@
 										</div>
 										<div
 											class="text-base-content/60 truncate font-mono text-base"
-											title={`${it.material_code || ''}${it.sku_name || it.sku_code ? ` · ${it.sku_name || ''}${it.sku_code ? ` [${it.sku_code}]` : ''}` : ''}`}
+											title={it.material_code || ''}
 										>
-											{it.material_code || ''}
-											{#if it.sku_name || it.sku_code}
-												· {it.sku_name || ''}
-												{#if it.sku_code}
-													<span>[{it.sku_code}]</span>
-												{/if}
-											{/if}
+											{it.material_code || '-'}
 										</div>
 									</div>
 								</td>
 								<td class="whitespace-nowrap">
-									<button
-										type="button"
-										class="btn btn-xs btn-ghost text-base whitespace-nowrap"
-										onclick={() => viewAttrs(it)}
-										disabled={!it.sku_id}
-									>
-										查看
-									</button>
+									<span class="text-sm">{(it.custom_attributes || []).length}项</span>
 								</td>
 								<td class="text-right font-mono">{it.quantity ?? '-'}</td>
 								<td>{it.unit || '-'}</td>
@@ -292,5 +268,3 @@
 		</div>
 	{/if}
 </div>
-
-<SkuAttrViewer bind:this={skuAttrViewer} />

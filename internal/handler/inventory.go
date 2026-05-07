@@ -8,6 +8,7 @@ package handler
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +18,13 @@ import (
 	"github.com/redgreat/teweicun/internal/service"
 	"github.com/xuri/excelize/v2"
 )
+
+func pickLedgerKeyword(materialName, legacySKUName string) string {
+	if strings.TrimSpace(materialName) != "" {
+		return materialName
+	}
+	return legacySKUName
+}
 
 func ListInventoryDetail(c *gin.Context) {
 	var q request.InventoryQuery
@@ -105,8 +113,8 @@ func ListInventoryIssued(c *gin.Context) {
 	response.SuccessPage(c, total, list)
 }
 
-func ListInventorySKULedger(c *gin.Context) {
-	var q request.InventorySKULedgerQuery
+func ListInventoryMaterialLedger(c *gin.Context) {
+	var q request.InventoryMaterialLedgerQuery
 	if err := c.ShouldBindQuery(&q); err != nil {
 		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
 		return
@@ -118,7 +126,7 @@ func ListInventorySKULedger(c *gin.Context) {
 		q.PageSize = 10
 	}
 
-	list, total, stats, err := service.ListInventorySKULedger(c.Request.Context(), &q)
+	list, total, stats, err := service.ListInventoryMaterialLedger(c.Request.Context(), &q)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -132,13 +140,17 @@ func ListInventorySKULedger(c *gin.Context) {
 	})
 }
 
-func ListInventorySKUSerials(c *gin.Context) {
-	var q request.InventorySKUSerialQuery
+func ListInventorySKULedger(c *gin.Context) {
+	ListInventoryMaterialLedger(c)
+}
+
+func ListInventoryMaterialLedgerSerials(c *gin.Context) {
+	var q request.InventoryMaterialLedgerSerialQuery
 	if err := c.ShouldBindQuery(&q); err != nil {
 		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
 		return
 	}
-	list, err := service.ListInventorySKUSerials(c.Request.Context(), &q)
+	list, err := service.ListInventoryMaterialLedgerSerials(c.Request.Context(), &q)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -146,14 +158,18 @@ func ListInventorySKUSerials(c *gin.Context) {
 	response.Success(c, list)
 }
 
-func ExportInventorySKULedger(c *gin.Context) {
-	var q request.InventorySKULedgerQuery
+func ListInventorySKUSerials(c *gin.Context) {
+	ListInventoryMaterialLedgerSerials(c)
+}
+
+func ExportInventoryMaterialLedger(c *gin.Context) {
+	var q request.InventoryMaterialLedgerQuery
 	if err := c.ShouldBindQuery(&q); err != nil {
 		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
 		return
 	}
 
-	rows, stats, err := service.ExportInventorySKULedger(c.Request.Context(), &q)
+	rows, stats, err := service.ExportInventoryMaterialLedger(c.Request.Context(), &q)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -230,7 +246,7 @@ func ExportInventorySKULedger(c *gin.Context) {
 	})
 	numberStyle, _ := f.NewStyle(&excelize.Style{
 		CustomNumFmt: &[]string{"#,##0.000"}[0],
-		Alignment: &excelize.Alignment{Horizontal: "right", Vertical: "center"},
+		Alignment:    &excelize.Alignment{Horizontal: "right", Vertical: "center"},
 		Border: []excelize.Border{
 			{Type: "left", Color: "#E5E7EB", Style: 1},
 			{Type: "right", Color: "#E5E7EB", Style: 1},
@@ -265,8 +281,8 @@ func ExportInventorySKULedger(c *gin.Context) {
 
 	_ = f.MergeCell(sheet, "A2", "K2")
 	_ = f.SetCellValue(sheet, "A2",
-		fmt.Sprintf("导出时间：%s  |  筛选：SKU[%s] 仓库[%s] 价格区间[%.2f - %.2f]",
-			time.Now().Format("2006-01-02 15:04:05"), q.SKUName, q.WarehouseName, q.PriceMin, q.PriceMax))
+		fmt.Sprintf("导出时间：%s  |  筛选：物料[%s] 仓库[%s] 价格区间[%.2f - %.2f]",
+			time.Now().Format("2006-01-02 15:04:05"), pickLedgerKeyword(q.MaterialName, q.SKUName), q.WarehouseName, q.PriceMin, q.PriceMax))
 	_ = f.SetCellStyle(sheet, "A2", "K2", subTitleStyle)
 
 	_ = f.MergeCell(sheet, "A3", "B3")
@@ -290,7 +306,7 @@ func ExportInventorySKULedger(c *gin.Context) {
 	_ = f.SetCellValue(sheet, "K3", fmt.Sprintf("总锁定数量：%.3f", stats.TotalLockedQty))
 	_ = f.SetCellStyle(sheet, "K3", "K3", summaryQtyValueStyle)
 
-	headers := []string{"物料名称", "SKU名称", "所在仓库", "是否编码", "库存数量", "单价", "总价", "锁定数量", "库存批次数", "属性", "编码"}
+	headers := []string{"物料名称", "所在仓库", "是否编码", "库存数量", "单价", "总价", "锁定数量", "库存批次数", "属性", "编码"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 5)
 		_ = f.SetCellValue(sheet, cell, h)
@@ -301,7 +317,6 @@ func ExportInventorySKULedger(c *gin.Context) {
 		rowNo := idx + 6
 		values := []interface{}{
 			r.MaterialName,
-			r.SKUName,
 			r.WarehouseName,
 			map[bool]string{true: "有编码", false: "无编码"}[r.IsCode],
 			r.Quantity,
@@ -316,21 +331,20 @@ func ExportInventorySKULedger(c *gin.Context) {
 			cell, _ := excelize.CoordinatesToCellName(i+1, rowNo)
 			_ = f.SetCellValue(sheet, cell, v)
 		}
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("A%d", rowNo), fmt.Sprintf("D%d", rowNo), bodyStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("E%d", rowNo), fmt.Sprintf("E%d", rowNo), numberStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("F%d", rowNo), fmt.Sprintf("G%d", rowNo), moneyStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("H%d", rowNo), fmt.Sprintf("H%d", rowNo), numberStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("I%d", rowNo), fmt.Sprintf("I%d", rowNo), countStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("J%d", rowNo), fmt.Sprintf("K%d", rowNo), bodyStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("A%d", rowNo), fmt.Sprintf("C%d", rowNo), bodyStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("D%d", rowNo), fmt.Sprintf("D%d", rowNo), numberStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("E%d", rowNo), fmt.Sprintf("F%d", rowNo), moneyStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("G%d", rowNo), fmt.Sprintf("G%d", rowNo), numberStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("H%d", rowNo), fmt.Sprintf("H%d", rowNo), countStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("I%d", rowNo), fmt.Sprintf("J%d", rowNo), bodyStyle)
 	}
 
-	_ = f.SetColWidth(sheet, "A", "A", 20)
-	_ = f.SetColWidth(sheet, "B", "B", 36)
-	_ = f.SetColWidth(sheet, "C", "C", 14)
-	_ = f.SetColWidth(sheet, "D", "D", 10)
-	_ = f.SetColWidth(sheet, "E", "H", 12)
-	_ = f.SetColWidth(sheet, "I", "I", 12)
-	_ = f.SetColWidth(sheet, "J", "K", 10)
+	_ = f.SetColWidth(sheet, "A", "A", 30)
+	_ = f.SetColWidth(sheet, "B", "B", 14)
+	_ = f.SetColWidth(sheet, "C", "C", 10)
+	_ = f.SetColWidth(sheet, "D", "G", 12)
+	_ = f.SetColWidth(sheet, "H", "H", 12)
+	_ = f.SetColWidth(sheet, "I", "J", 10)
 	_ = f.SetRowHeight(sheet, 1, 30)
 	_ = f.SetRowHeight(sheet, 2, 22)
 	_ = f.SetRowHeight(sheet, 3, 22)
@@ -366,4 +380,8 @@ func ExportInventorySKULedger(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
+}
+
+func ExportInventorySKULedger(c *gin.Context) {
+	ExportInventoryMaterialLedger(c)
 }

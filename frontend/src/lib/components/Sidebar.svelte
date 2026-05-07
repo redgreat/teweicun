@@ -11,7 +11,6 @@
 		ShoppingCart,
 		Warehouse,
 		TrendingUp,
-		Settings,
 		ChevronLeft,
 		ClipboardCheck,
 		History
@@ -55,18 +54,11 @@
 			icon: Package,
 			children: [
 				{ name: '物料管理', path: '/materials' },
-				{ name: 'SKU管理', path: '/materials/skus' },
 				{ name: '物料属性', path: '/materials/attributes' },
 				{ name: '物料分类', path: '/materials/categories' },
 				{ name: '供应商管理', path: '/suppliers' },
 				{ name: '客户管理', path: '/customers' },
-				{ name: '仓库管理', path: '/warehouses' }
-			]
-		},
-		{
-			name: '系统管理',
-			icon: Settings,
-			children: [
+				{ name: '仓库管理', path: '/warehouses' },
 				{ name: '用户管理', path: '/system/users' },
 				{ name: '角色权限', path: '/system/roles' },
 				{ name: '数据字典', path: '/system/dicts' }

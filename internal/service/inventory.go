@@ -30,6 +30,18 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 	return db.ListInventoryIssued(ctx, q)
 }
 
+func ListInventoryMaterialLedger(ctx context.Context, q *request.InventoryMaterialLedgerQuery) ([]response.InventoryMaterialLedgerResp, int64, *response.InventoryMaterialLedgerStatsResp, error) {
+	return db.ListInventoryMaterialLedger(ctx, q)
+}
+
+func ListInventoryMaterialLedgerSerials(ctx context.Context, q *request.InventoryMaterialLedgerSerialQuery) ([]response.InventoryMaterialLedgerSerialResp, error) {
+	return db.ListInventoryMaterialLedgerSerials(ctx, q)
+}
+
+func ExportInventoryMaterialLedger(ctx context.Context, q *request.InventoryMaterialLedgerQuery) ([]response.InventoryMaterialLedgerResp, *response.InventoryMaterialLedgerStatsResp, error) {
+	return db.ExportInventoryMaterialLedger(ctx, q)
+}
+
 func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, int64, *response.InventorySKULedgerStatsResp, error) {
 	return db.ListInventorySKULedger(ctx, q)
 }

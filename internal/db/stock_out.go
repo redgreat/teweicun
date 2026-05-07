@@ -183,14 +183,13 @@ func GetStockOutDetail(ctx context.Context, id int64) (*response.StockOutResp, e
 
 	itemQuery := `
 		SELECT soi.id, soi.material_id, m.material_code, m.material_name,
-		       COALESCE(i.sku_id, 0), COALESCE(v.sku_code, ''), COALESCE(v.sku_name, ''),
+		       0::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
 		       soi.inventory_id, soi.quantity,
 		       soi.unit, COALESCE(i.unit_cost, 0),
 		       m.is_code
 		FROM stock_out_item soi
 		INNER JOIN material m ON m.id = soi.material_id
 		LEFT JOIN inventory i ON i.id = soi.inventory_id
-		LEFT JOIN v_sku_list v ON v.id = i.sku_id
 		WHERE soi.stock_out_id = $1
 	`
 	rows, err := database.Pool.Query(ctx, itemQuery, id)

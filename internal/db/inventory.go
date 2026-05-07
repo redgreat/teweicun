@@ -152,7 +152,7 @@ func ListInventoryAvailable(ctx context.Context, q *request.InventoryAvailableQu
 	}
 
 	if strings.TrimSpace(q.Q) != "" {
-		where = append(where, fmt.Sprintf("(m.material_code ILIKE $%d OR m.material_name ILIKE $%d OR v.sku_code ILIKE $%d OR v.sku_name ILIKE $%d)", argID, argID, argID, argID))
+		where = append(where, fmt.Sprintf("(m.material_code ILIKE $%d OR m.material_name ILIKE $%d)", argID, argID))
 		args = append(args, "%"+q.Q+"%")
 		argID++
 	}
@@ -177,7 +177,6 @@ func ListInventoryAvailable(ctx context.Context, q *request.InventoryAvailableQu
 		  LIMIT 1
 		) itx ON true
 		LEFT JOIN stock_in si ON si.id = itx.ref_doc_id
-		LEFT JOIN v_sku_list v ON v.id = i.sku_id
 		WHERE %s
 	`, whereClause)
 	if err := database.Pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
@@ -188,11 +187,11 @@ func ListInventoryAvailable(ctx context.Context, q *request.InventoryAvailableQu
 		SELECT
 			i.id AS inventory_id,
 			i.material_id, m.material_code, m.material_name, m.is_code,
-			COALESCE(i.sku_id, 0) AS sku_id,
-			COALESCE(v.sku_code, '') AS sku_code,
-			COALESCE(v.sku_name, '') AS sku_name,
+			0::bigint AS sku_id,
+			''::varchar AS sku_code,
+			''::varchar AS sku_name,
 			i.warehouse_id, w.warehouse_code, w.warehouse_name,
-			COALESCE(v.unit, m.unit, i.unit) AS unit, COALESCE(i.unit_cost, 0),
+			COALESCE(m.unit, i.unit) AS unit, COALESCE(i.unit_cost, 0),
 			i.quantity, i.locked_quantity, COALESCE(i.in_transit_quantity, 0) AS in_transit_quantity,
 			(i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)) AS available_quantity
 		FROM inventory i
@@ -209,7 +208,6 @@ func ListInventoryAvailable(ctx context.Context, q *request.InventoryAvailableQu
 		  LIMIT 1
 		) itx ON true
 		LEFT JOIN stock_in si ON si.id = itx.ref_doc_id
-		LEFT JOIN v_sku_list v ON v.id = i.sku_id
 		WHERE %s
 		ORDER BY w.warehouse_code, m.material_code, i.stock_in_date ASC NULLS LAST, i.id ASC
 		LIMIT $%d OFFSET $%d
@@ -255,7 +253,7 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 		args = append(args, strings.TrimSpace(q.WarehouseCode))
 	}
 	if strings.TrimSpace(q.Q) != "" {
-		qSQL = fmt.Sprintf("(m.material_code ILIKE $%d OR m.material_name ILIKE $%d OR COALESCE(v.sku_code, '') ILIKE $%d OR COALESCE(v.sku_name, '') ILIKE $%d)", len(args)+1, len(args)+1, len(args)+1, len(args)+1)
+		qSQL = fmt.Sprintf("(m.material_code ILIKE $%d OR m.material_name ILIKE $%d)", len(args)+1, len(args)+1)
 		args = append(args, "%"+strings.TrimSpace(q.Q)+"%")
 	}
 
@@ -284,12 +282,10 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 			INNER JOIN inventory i ON i.id = sc.inventory_id
 			INNER JOIN material m ON m.id = sc.material_id
 			INNER JOIN warehouse w ON w.id = i.warehouse_id AND w.deleted_at IS NULL
-			LEFT JOIN v_sku_list v ON v.id = i.sku_id
 			WHERE %s
 			GROUP BY i.id, sc.material_id, m.material_code, m.material_name, m.is_code,
-			         COALESCE(i.sku_id, 0), COALESCE(v.sku_code, ''), COALESCE(v.sku_name, ''),
 			         i.warehouse_id, w.warehouse_code, w.warehouse_name,
-			         COALESCE(v.unit, m.unit, i.unit), COALESCE(i.unit_cost, 0),
+			         COALESCE(m.unit, i.unit), COALESCE(i.unit_cost, 0),
 			         i.quantity, i.locked_quantity, i.in_transit_quantity
 			HAVING COUNT(*) > 0
 			UNION ALL
@@ -297,7 +293,6 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 			FROM inventory i
 			INNER JOIN material m ON m.id = i.material_id AND COALESCE(m.is_code, false) = false
 			INNER JOIN warehouse w ON w.id = i.warehouse_id AND w.deleted_at IS NULL
-			LEFT JOIN v_sku_list v ON v.id = i.sku_id
 			INNER JOIN (
 				SELECT soi.inventory_id, SUM(soi.quantity) AS out_qty
 				FROM stock_out_item soi
@@ -334,10 +329,10 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 			SELECT
 				i.id AS inventory_id,
 				sc.material_id, m.material_code, m.material_name, COALESCE(m.is_code, false),
-				COALESCE(i.sku_id, 0) AS sku_id,
-				COALESCE(v.sku_code, '') AS sku_code, COALESCE(v.sku_name, '') AS sku_name,
+				0::bigint AS sku_id,
+				''::varchar AS sku_code, ''::varchar AS sku_name,
 				i.warehouse_id, w.warehouse_code, w.warehouse_name,
-				COALESCE(v.unit, m.unit, i.unit) AS unit,
+				COALESCE(m.unit, i.unit) AS unit,
 				COALESCE(i.unit_cost, 0) AS unit_cost,
 				COUNT(*)::double precision AS issued_quantity,
 				(i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0))::double precision AS available_quantity
@@ -345,29 +340,26 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 			INNER JOIN inventory i ON i.id = sc.inventory_id
 			INNER JOIN material m ON m.id = sc.material_id
 			INNER JOIN warehouse w ON w.id = i.warehouse_id AND w.deleted_at IS NULL
-			LEFT JOIN v_sku_list v ON v.id = i.sku_id
 			WHERE %s
 			GROUP BY i.id, sc.material_id, m.material_code, m.material_name, m.is_code,
-			         COALESCE(i.sku_id, 0), COALESCE(v.sku_code, ''), COALESCE(v.sku_name, ''),
 			         i.warehouse_id, w.warehouse_code, w.warehouse_name,
-			         COALESCE(v.unit, m.unit, i.unit), COALESCE(i.unit_cost, 0),
+			         COALESCE(m.unit, i.unit), COALESCE(i.unit_cost, 0),
 			         i.quantity, i.locked_quantity, i.in_transit_quantity
 			HAVING COUNT(*) > 0
 			UNION ALL
 			SELECT
 				i.id AS inventory_id,
 				i.material_id, m.material_code, m.material_name, COALESCE(m.is_code, false),
-				COALESCE(i.sku_id, 0) AS sku_id,
-				COALESCE(v.sku_code, '') AS sku_code, COALESCE(v.sku_name, '') AS sku_name,
+				0::bigint AS sku_id,
+				''::varchar AS sku_code, ''::varchar AS sku_name,
 				i.warehouse_id, w.warehouse_code, w.warehouse_name,
-				COALESCE(v.unit, m.unit, i.unit) AS unit,
+				COALESCE(m.unit, i.unit) AS unit,
 				COALESCE(i.unit_cost, 0) AS unit_cost,
 				GREATEST(COALESCE(so_agg.out_qty, 0) - COALESCE(rev_agg.ret_qty, 0), 0)::double precision AS issued_quantity,
 				(i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0))::double precision AS available_quantity
 			FROM inventory i
 			INNER JOIN material m ON m.id = i.material_id AND COALESCE(m.is_code, false) = false
 			INNER JOIN warehouse w ON w.id = i.warehouse_id AND w.deleted_at IS NULL
-			LEFT JOIN v_sku_list v ON v.id = i.sku_id
 			INNER JOIN (
 				SELECT soi.inventory_id, SUM(soi.quantity) AS out_qty
 				FROM stock_out_item soi
@@ -390,7 +382,7 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 			  AND %s
 			  AND %s
 		) merged
-		ORDER BY merged.warehouse_code, merged.material_code, merged.sku_code, merged.inventory_id
+		ORDER BY merged.warehouse_code, merged.material_code, merged.inventory_id
 		LIMIT $%d OFFSET $%d
 	`, codedWhere, whSQL, qSQL, limitArg, offArg)
 
@@ -420,14 +412,18 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 	return out, total, rows.Err()
 }
 
-func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, int64, *response.InventorySKULedgerStatsResp, error) {
+func ListInventoryMaterialLedger(ctx context.Context, q *request.InventoryMaterialLedgerQuery) ([]response.InventoryMaterialLedgerResp, int64, *response.InventoryMaterialLedgerStatsResp, error) {
 	where := []string{"1=1"}
 	var args []interface{}
 	argID := 1
 
-	if strings.TrimSpace(q.SKUName) != "" {
-		where = append(where, fmt.Sprintf("(COALESCE(v.sku_name, '') ILIKE $%d OR COALESCE(v.sku_code, '') ILIKE $%d)", argID, argID))
-		args = append(args, "%"+strings.TrimSpace(q.SKUName)+"%")
+	keyword := strings.TrimSpace(q.MaterialName)
+	if keyword == "" {
+		keyword = strings.TrimSpace(q.SKUName)
+	}
+	if keyword != "" {
+		where = append(where, fmt.Sprintf("(m.material_name ILIKE $%d OR m.material_code ILIKE $%d)", argID, argID))
+		args = append(args, "%"+keyword+"%")
 		argID++
 	}
 	if strings.TrimSpace(q.WarehouseName) != "" {
@@ -453,7 +449,6 @@ func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQu
 		FROM inventory i
 		INNER JOIN material m ON m.id = i.material_id
 		INNER JOIN warehouse w ON w.id = i.warehouse_id AND w.deleted_at IS NULL
-		LEFT JOIN v_sku_list v ON v.id = i.sku_id
 		WHERE %s
 	`, whereClause)
 
@@ -461,9 +456,9 @@ func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQu
 	countQuery := fmt.Sprintf(`
 		SELECT count(*)
 		FROM (
-			SELECT i.material_id, COALESCE(i.sku_id, 0), i.warehouse_id, COALESCE(i.unit_cost, 0)
+			SELECT i.material_id, i.warehouse_id, COALESCE(i.unit_cost, 0)
 			%s
-			GROUP BY i.material_id, COALESCE(i.sku_id, 0), i.warehouse_id, COALESCE(i.unit_cost, 0)
+			GROUP BY i.material_id, i.warehouse_id, COALESCE(i.unit_cost, 0)
 		) t
 	`, groupBase)
 	if err := database.Pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
@@ -478,7 +473,7 @@ func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQu
 			COALESCE(SUM(i.locked_quantity), 0)
 		%s
 	`, groupBase)
-	stats := &response.InventorySKULedgerStatsResp{}
+	stats := &response.InventoryMaterialLedgerStatsResp{}
 	if err := database.Pool.QueryRow(ctx, statsQuery, args...).Scan(
 		&stats.TotalAmount, &stats.CodeTotalAmount, &stats.NoCodeTotalAmount, &stats.TotalLockedQty,
 	); err != nil {
@@ -489,8 +484,8 @@ func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQu
 		SELECT
 			i.material_id,
 			COALESCE(m.material_name, ''),
-			COALESCE(i.sku_id, 0),
-			COALESCE(v.sku_name, ''),
+			0::bigint AS sku_id,
+			''::varchar AS sku_name,
 			i.warehouse_id,
 			COALESCE(w.warehouse_name, ''),
 			COALESCE(m.is_code, false),
@@ -499,10 +494,10 @@ func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQu
 			COALESCE(SUM((i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)) * COALESCE(i.unit_cost, 0)), 0) AS total_amount,
 			COALESCE(SUM(i.locked_quantity), 0) AS locked_quantity,
 			COUNT(*) AS inventory_count,
-			MAX(CASE WHEN i.sku_id IS NOT NULL THEN 1 ELSE 0 END) > 0 AS has_custom_attrs
+			MAX(CASE WHEN jsonb_array_length(COALESCE(i.custom_attributes, '[]'::jsonb)) > 0 THEN 1 ELSE 0 END) > 0 AS has_custom_attrs
 		%s
-		GROUP BY i.material_id, m.material_name, COALESCE(i.sku_id, 0), COALESCE(v.sku_name, ''), i.warehouse_id, w.warehouse_name, COALESCE(m.is_code, false), COALESCE(i.unit_cost, 0)
-		ORDER BY m.material_name ASC, COALESCE(v.sku_name, '') ASC, w.warehouse_name ASC, COALESCE(i.unit_cost, 0) ASC
+		GROUP BY i.material_id, m.material_name, i.warehouse_id, w.warehouse_name, COALESCE(m.is_code, false), COALESCE(i.unit_cost, 0)
+		ORDER BY m.material_name ASC, w.warehouse_name ASC, COALESCE(i.unit_cost, 0) ASC
 		LIMIT $%d OFFSET $%d
 	`, groupBase, argID, argID+1)
 
@@ -513,9 +508,9 @@ func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQu
 	}
 	defer rows.Close()
 
-	result := make([]response.InventorySKULedgerResp, 0)
+	result := make([]response.InventoryMaterialLedgerResp, 0)
 	for rows.Next() {
-		var item response.InventorySKULedgerResp
+		var item response.InventoryMaterialLedgerResp
 		if err := rows.Scan(
 			&item.MaterialID, &item.MaterialName, &item.SKUID, &item.SKUName, &item.WarehouseID, &item.WarehouseName,
 			&item.IsCode, &item.Quantity, &item.UnitCost, &item.TotalAmount, &item.LockedQuantity, &item.InventoryCount, &item.HasCustomAttrs,
@@ -528,7 +523,7 @@ func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQu
 	return result, total, stats, rows.Err()
 }
 
-func ListInventorySKUSerials(ctx context.Context, q *request.InventorySKUSerialQuery) ([]response.InventorySKUSerialResp, error) {
+func ListInventoryMaterialLedgerSerials(ctx context.Context, q *request.InventoryMaterialLedgerSerialQuery) ([]response.InventoryMaterialLedgerSerialResp, error) {
 	sql := `
 		SELECT
 			sc.serial_code,
@@ -544,19 +539,18 @@ func ListInventorySKUSerials(ctx context.Context, q *request.InventorySKUSerialQ
 		INNER JOIN inventory i ON i.id = sc.inventory_id
 		WHERE i.material_id = $1
 		  AND i.warehouse_id = $2
-		  AND COALESCE(i.sku_id, 0) = COALESCE($3, 0)
-		  AND COALESCE(i.unit_cost, 0) = $4
+		  AND COALESCE(i.unit_cost, 0) = $3
 		ORDER BY sc.serial_code ASC
 	`
-	rows, err := database.Pool.Query(ctx, sql, q.MaterialID, q.WarehouseID, q.SKUID, q.UnitCost)
+	rows, err := database.Pool.Query(ctx, sql, q.MaterialID, q.WarehouseID, q.UnitCost)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	out := make([]response.InventorySKUSerialResp, 0)
+	out := make([]response.InventoryMaterialLedgerSerialResp, 0)
 	for rows.Next() {
-		var item response.InventorySKUSerialResp
+		var item response.InventoryMaterialLedgerSerialResp
 		if err := rows.Scan(&item.SerialCode, &item.Status, &item.StatusName); err != nil {
 			return nil, err
 		}
@@ -565,14 +559,18 @@ func ListInventorySKUSerials(ctx context.Context, q *request.InventorySKUSerialQ
 	return out, rows.Err()
 }
 
-func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, *response.InventorySKULedgerStatsResp, error) {
+func ExportInventoryMaterialLedger(ctx context.Context, q *request.InventoryMaterialLedgerQuery) ([]response.InventoryMaterialLedgerResp, *response.InventoryMaterialLedgerStatsResp, error) {
 	where := []string{"1=1"}
 	var args []interface{}
 	argID := 1
 
-	if strings.TrimSpace(q.SKUName) != "" {
-		where = append(where, fmt.Sprintf("(COALESCE(v.sku_name, '') ILIKE $%d OR COALESCE(v.sku_code, '') ILIKE $%d)", argID, argID))
-		args = append(args, "%"+strings.TrimSpace(q.SKUName)+"%")
+	keyword := strings.TrimSpace(q.MaterialName)
+	if keyword == "" {
+		keyword = strings.TrimSpace(q.SKUName)
+	}
+	if keyword != "" {
+		where = append(where, fmt.Sprintf("(m.material_name ILIKE $%d OR m.material_code ILIKE $%d)", argID, argID))
+		args = append(args, "%"+keyword+"%")
 		argID++
 	}
 	if strings.TrimSpace(q.WarehouseName) != "" {
@@ -598,7 +596,6 @@ func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedger
 		FROM inventory i
 		INNER JOIN material m ON m.id = i.material_id
 		INNER JOIN warehouse w ON w.id = i.warehouse_id AND w.deleted_at IS NULL
-		LEFT JOIN v_sku_list v ON v.id = i.sku_id
 		WHERE %s
 	`, whereClause)
 
@@ -610,7 +607,7 @@ func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedger
 			COALESCE(SUM(i.locked_quantity), 0)
 		%s
 	`, groupBase)
-	stats := &response.InventorySKULedgerStatsResp{}
+	stats := &response.InventoryMaterialLedgerStatsResp{}
 	if err := database.Pool.QueryRow(ctx, statsQuery, args...).Scan(
 		&stats.TotalAmount, &stats.CodeTotalAmount, &stats.NoCodeTotalAmount, &stats.TotalLockedQty,
 	); err != nil {
@@ -621,8 +618,8 @@ func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedger
 		SELECT
 			i.material_id,
 			COALESCE(m.material_name, ''),
-			COALESCE(i.sku_id, 0),
-			COALESCE(v.sku_name, ''),
+			0::bigint AS sku_id,
+			''::varchar AS sku_name,
 			i.warehouse_id,
 			COALESCE(w.warehouse_name, ''),
 			COALESCE(m.is_code, false),
@@ -631,10 +628,10 @@ func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedger
 			COALESCE(SUM((i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)) * COALESCE(i.unit_cost, 0)), 0) AS total_amount,
 			COALESCE(SUM(i.locked_quantity), 0) AS locked_quantity,
 			COUNT(*) AS inventory_count,
-			MAX(CASE WHEN i.sku_id IS NOT NULL THEN 1 ELSE 0 END) > 0 AS has_custom_attrs
+			MAX(CASE WHEN jsonb_array_length(COALESCE(i.custom_attributes, '[]'::jsonb)) > 0 THEN 1 ELSE 0 END) > 0 AS has_custom_attrs
 		%s
-		GROUP BY i.material_id, m.material_name, COALESCE(i.sku_id, 0), COALESCE(v.sku_name, ''), i.warehouse_id, w.warehouse_name, COALESCE(m.is_code, false), COALESCE(i.unit_cost, 0)
-		ORDER BY m.material_name ASC, COALESCE(v.sku_name, '') ASC, w.warehouse_name ASC, COALESCE(i.unit_cost, 0) ASC
+		GROUP BY i.material_id, m.material_name, i.warehouse_id, w.warehouse_name, COALESCE(m.is_code, false), COALESCE(i.unit_cost, 0)
+		ORDER BY m.material_name ASC, w.warehouse_name ASC, COALESCE(i.unit_cost, 0) ASC
 	`, groupBase)
 
 	rows, err := database.Pool.Query(ctx, query, args...)
@@ -643,9 +640,9 @@ func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedger
 	}
 	defer rows.Close()
 
-	result := make([]response.InventorySKULedgerResp, 0)
+	result := make([]response.InventoryMaterialLedgerResp, 0)
 	for rows.Next() {
-		var item response.InventorySKULedgerResp
+		var item response.InventoryMaterialLedgerResp
 		if err := rows.Scan(
 			&item.MaterialID, &item.MaterialName, &item.SKUID, &item.SKUName, &item.WarehouseID, &item.WarehouseName,
 			&item.IsCode, &item.Quantity, &item.UnitCost, &item.TotalAmount, &item.LockedQuantity, &item.InventoryCount, &item.HasCustomAttrs,
@@ -656,4 +653,16 @@ func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedger
 	}
 
 	return result, stats, rows.Err()
+}
+
+func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, int64, *response.InventorySKULedgerStatsResp, error) {
+	return ListInventoryMaterialLedger(ctx, q)
+}
+
+func ListInventorySKUSerials(ctx context.Context, q *request.InventorySKUSerialQuery) ([]response.InventorySKUSerialResp, error) {
+	return ListInventoryMaterialLedgerSerials(ctx, q)
+}
+
+func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, *response.InventorySKULedgerStatsResp, error) {
+	return ExportInventoryMaterialLedger(ctx, q)
 }

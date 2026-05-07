@@ -187,14 +187,6 @@ func main() {
 			protected.PUT("/base/material-attributes/:id", handler.UpdateMaterialAttributeDef)
 			protected.DELETE("/base/material-attributes/:id", handler.DeleteMaterialAttributeDef)
 
-			// SKU Routes
-			protected.GET("/base/skus", handler.ListSKUs)
-			protected.GET("/base/skus/:id", handler.GetSKU)
-			protected.POST("/base/skus", handler.CreateSKU)
-			protected.PUT("/base/skus/:id", handler.UpdateSKU)
-			protected.DELETE("/base/skus/:id", handler.DeleteSKU)
-			protected.GET("/base/materials/:id/skus", handler.ListSKUsByMaterial)
-
 			// Supplier Routes
 			protected.GET("/base/suppliers", handler.ListSuppliers)
 			protected.POST("/base/suppliers", handler.CreateSupplier)
@@ -289,6 +281,9 @@ func main() {
 			protected.GET("/inventory/summary", handler.ListInventorySummary)
 			protected.GET("/inventory/available", handler.ListInventoryAvailable)
 			protected.GET("/inventory/issued", handler.ListInventoryIssued)
+			protected.GET("/inventory/material-ledger", handler.ListInventoryMaterialLedger)
+			protected.GET("/inventory/material-ledger/serials", handler.ListInventoryMaterialLedgerSerials)
+			protected.GET("/inventory/material-ledger/export", handler.ExportInventoryMaterialLedger)
 			protected.GET("/inventory/sku-ledger", handler.ListInventorySKULedger)
 			protected.GET("/inventory/sku-ledger/serials", handler.ListInventorySKUSerials)
 			protected.GET("/inventory/sku-ledger/export", handler.ExportInventorySKULedger)

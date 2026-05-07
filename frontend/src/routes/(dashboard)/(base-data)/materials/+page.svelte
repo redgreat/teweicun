@@ -49,7 +49,6 @@
 		{ key: 'material_name', label: '名称', class: 'font-bold', width: '260px' },
 		{ key: 'category_name', label: '分类', width: '220px' },
 		{ key: 'unit_name', label: '单位', width: '90px' },
-		{ key: 'sku_count', label: 'SKU', width: '80px' },
 		{ key: 'status_name', label: '状态', width: '90px' }
 	];
 
@@ -71,7 +70,6 @@
 		try {
 			const res: any = await api.get('/base/categories/tree');
 			categories = res || [];
-			// 默认展开第一层
 			if (expandedCatIds.size === 0) {
 				expandedCatIds = new Set(categories.map((c: any) => c.id));
 			}
@@ -193,7 +191,7 @@
 		}
 	}
 
-	async function handleDelete(mat: any) {
+	function handleDelete(mat: any) {
 		deleteTarget = mat;
 		showConfirm = true;
 	}
@@ -209,7 +207,6 @@
 		}
 	}
 
-	// 获取分类名称（用于弹窗中显示已选分类）
 	function getCategoryName(id: number, nodes: any[] = categories): string {
 		for (const node of nodes) {
 			if (node.id === id) return node.category_name;
@@ -247,17 +244,6 @@
 				>
 			{:else if key === 'material_name' || key === 'category_name'}
 				<span class="block truncate" title={value || ''}>{value || '-'}</span>
-			{:else if key === 'sku_count'}
-				{#if row.sku_managed}
-					<a
-						href="/materials/skus?material_id={row.id}"
-						class="badge badge-sm badge-primary gap-1 transition-all hover:brightness-110"
-					>
-						{value || 0}
-					</a>
-				{:else}
-					<span class="badge badge-sm badge-ghost text-base-content/30">-</span>
-				{/if}
 			{:else}
 				{value || '-'}
 			{/if}
@@ -275,7 +261,6 @@
 	</DataGrid>
 </div>
 
-<!-- 新增/编辑物料弹窗 -->
 <Modal
 	bind:show={showModal}
 	title={editingId ? '编辑物料' : '新增物料'}
@@ -316,21 +301,12 @@
 						><span class="label-text flex items-center gap-2"><Package size={14} /> 物料编码</span
 						></label
 					>
-					{#if editingId}
-						<input
-							type="text"
-							bind:value={form.material_code}
-							class="input input-bordered bg-base-200/50 w-full"
-							disabled
-						/>
-					{:else}
-						<input
-							type="text"
-							value="系统自动生成"
-							class="input input-bordered bg-base-200/50 w-full"
-							disabled
-						/>
-					{/if}
+					<input
+						type="text"
+						bind:value={form.material_code}
+						class="input input-bordered bg-base-200/50 w-full"
+						placeholder={editingId ? '' : '留空自动生成'}
+					/>
 				</div>
 				<div class="form-control">
 					<label class="label"><span class="label-text">物料名称</span></label>
@@ -338,7 +314,7 @@
 						type="text"
 						bind:value={form.material_name}
 						class="input input-bordered bg-base-200/50 w-full"
-						placeholder="如 Q235B钢板"
+						placeholder="如 Q235B钢板（12mm/2000*6000）"
 					/>
 				</div>
 			</div>
@@ -421,17 +397,13 @@
 
 		<div class="flex min-h-0 w-full min-w-0 flex-1 basis-0 flex-col">
 			<div class="form-control flex min-h-0 flex-1 flex-col">
-				<label class="label shrink-0"
-					><span class="label-text">SKU属性（可不选，不选则系统默认生成一条无属性SKU）</span></label
-				>
+				<label class="label shrink-0"><span class="label-text">物料自定义属性</span></label>
 				<div
 					class="bg-base-200/30 border-base-300 flex min-h-0 flex-1 flex-col rounded-xl border p-3"
 				>
 					<div class="mb-2 flex min-h-[32px] shrink-0 flex-wrap gap-1.5">
 						{#if form.custom_attributes.length === 0}
-							<span class="text-base-content/30 py-1 text-xs"
-								>可直接保存，系统会为该物料生成一条默认SKU</span
-							>
+							<span class="text-base-content/30 py-1 text-xs">可不选，后续按需补充</span>
 						{:else}
 							{#each form.custom_attributes as attr}
 								<span class="badge badge-sm badge-primary badge-outline gap-1">
@@ -492,7 +464,6 @@
 	</div>
 </Modal>
 
-<!-- 帮助提示弹窗 -->
 {#if showHelpModal}
 	<div class="modal modal-open" onclick={() => (showHelpModal = '')}>
 		<div class="modal-box max-w-sm" onclick={(e: Event) => e.stopPropagation()}>

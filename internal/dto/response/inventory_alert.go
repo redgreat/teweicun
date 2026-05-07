@@ -10,7 +10,6 @@ type InventoryAlertResp struct {
 	MaterialID    int64   `json:"material_id"`
 	MaterialCode  string  `json:"material_code"`
 	MaterialName  string  `json:"material_name"`
-	Specification string  `json:"specification"`
 	Unit          string  `json:"unit"`
 	TotalQuantity float64 `json:"total_quantity"`
 	SafetyStock   float64 `json:"safety_stock"`

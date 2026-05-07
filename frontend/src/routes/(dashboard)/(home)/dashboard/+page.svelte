@@ -614,7 +614,7 @@
 					<div class="mt-0.5 text-sm font-bold">{bigscreen.summary.active_material_count || 0}</div>
 				</div>
 				<div class="bg-base-100 border-base-300 rounded-xl border p-2">
-					<div class="text-base-content/55 text-[11px]">活跃SKU数</div>
+					<div class="text-base-content/55 text-[11px]">活跃编码数</div>
 					<div class="mt-0.5 text-sm font-bold">{bigscreen.summary.active_sku_count || 0}</div>
 				</div>
 			</div>

@@ -137,7 +137,7 @@ func GetReturnOrderDetail(ctx context.Context, id int64) (*response.ReturnOrderR
 	// 查明细（含当前可用量、单价，供编辑页校验与展示）
 	itemQuery := `
 		SELECT roi.id, roi.material_id, m.material_code, m.material_name,
-		       COALESCE(roi.sku_id, 0), COALESCE(v.sku_code, ''), COALESCE(v.sku_name, ''),
+		       0::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
 		       COALESCE(roi.inventory_id, 0),
 		       COALESCE(roi.warehouse_code, ''), COALESCE(wh_line.warehouse_name, ''),
 		       roi.quantity, roi.unit,
@@ -145,7 +145,6 @@ func GetReturnOrderDetail(ctx context.Context, id int64) (*response.ReturnOrderR
 		       COALESCE(inv.unit_cost, 0)
 		FROM return_order_item roi
 		INNER JOIN material m ON m.id = roi.material_id
-		LEFT JOIN v_sku_list v ON v.id = roi.sku_id
 		LEFT JOIN warehouse wh_line ON wh_line.warehouse_code = roi.warehouse_code AND wh_line.deleted_at IS NULL
 		LEFT JOIN inventory inv ON inv.id = roi.inventory_id
 		WHERE roi.return_id = $1
@@ -218,18 +217,17 @@ func CreateReturnOrder(ctx context.Context, req *request.CreateReturnOrderReq, u
 			}
 
 			var materialID int64
-			var skuID *int64
 			var unit string
 			var invWarehouseID int64
 			var invWarehouseCode string
 
 			err = tx.QueryRow(ctx, `
-				SELECT i.material_id, i.sku_id, i.unit,
+				SELECT i.material_id, i.unit,
 				       i.warehouse_id, w.warehouse_code
 				FROM inventory i
 				INNER JOIN warehouse w ON w.id = i.warehouse_id
 				WHERE i.id = $1
-			`, item.InventoryID).Scan(&materialID, &skuID, &unit, &invWarehouseID, &invWarehouseCode)
+			`, item.InventoryID).Scan(&materialID, &unit, &invWarehouseID, &invWarehouseCode)
 			if err != nil {
 				if err == pgx.ErrNoRows {
 					return 0, fmt.Errorf("库存不存在")
@@ -247,10 +245,10 @@ func CreateReturnOrder(ctx context.Context, req *request.CreateReturnOrderReq, u
 			}
 
 			itemQuery := `
-				INSERT INTO return_order_item (return_id, inventory_id, material_id, sku_id, quantity, unit, warehouse_id, warehouse_code)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+				INSERT INTO return_order_item (return_id, inventory_id, material_id, quantity, unit, warehouse_id, warehouse_code)
+				VALUES ($1, $2, $3, $4, $5, $6, $7)
 			`
-			_, err = tx.Exec(ctx, itemQuery, id, item.InventoryID, materialID, skuID, item.Quantity, unit, invWarehouseID, invWarehouseCode)
+			_, err = tx.Exec(ctx, itemQuery, id, item.InventoryID, materialID, item.Quantity, unit, invWarehouseID, invWarehouseCode)
 			if err != nil {
 				return 0, err
 			}
@@ -319,18 +317,17 @@ func UpdateReturnOrder(ctx context.Context, id int64, req *request.UpdateReturnO
 		}
 
 		var materialID int64
-		var skuID *int64
 		var unit string
 		var invWarehouseID int64
 		var invWarehouseCode string
 
 		err = tx.QueryRow(ctx, `
-				SELECT i.material_id, i.sku_id, i.unit,
+				SELECT i.material_id, i.unit,
 				       i.warehouse_id, w.warehouse_code
 				FROM inventory i
 				INNER JOIN warehouse w ON w.id = i.warehouse_id
 				WHERE i.id = $1
-			`, item.InventoryID).Scan(&materialID, &skuID, &unit, &invWarehouseID, &invWarehouseCode)
+			`, item.InventoryID).Scan(&materialID, &unit, &invWarehouseID, &invWarehouseCode)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				return fmt.Errorf("库存不存在")
@@ -347,10 +344,10 @@ func UpdateReturnOrder(ctx context.Context, id int64, req *request.UpdateReturnO
 		}
 
 		itemQuery := `
-				INSERT INTO return_order_item (return_id, inventory_id, material_id, sku_id, quantity, unit, warehouse_id, warehouse_code)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+				INSERT INTO return_order_item (return_id, inventory_id, material_id, quantity, unit, warehouse_id, warehouse_code)
+				VALUES ($1, $2, $3, $4, $5, $6, $7)
 			`
-		if _, err = tx.Exec(ctx, itemQuery, id, item.InventoryID, materialID, skuID, item.Quantity, unit, invWarehouseID, invWarehouseCode); err != nil {
+		if _, err = tx.Exec(ctx, itemQuery, id, item.InventoryID, materialID, item.Quantity, unit, invWarehouseID, invWarehouseCode); err != nil {
 			return err
 		}
 	}

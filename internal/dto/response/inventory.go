@@ -13,7 +13,6 @@ type InventoryDetailResp struct {
 	MaterialID     int64      `json:"material_id"`
 	MaterialCode   string     `json:"material_code"`
 	MaterialName   string     `json:"material_name"`
-	Specification  string     `json:"specification"`
 	Unit           string     `json:"unit"`
 	WarehouseID    int64      `json:"warehouse_id"`
 	WarehouseName  string     `json:"warehouse_name"`
@@ -29,7 +28,6 @@ type InventorySummaryResp struct {
 	MaterialID     int64   `json:"material_id"`
 	MaterialCode   string  `json:"material_code"`
 	MaterialName   string  `json:"material_name"`
-	Specification  string  `json:"specification"`
 	Unit           string  `json:"unit"`
 	TotalQuantity  float64 `json:"total_quantity"`
 	LockedQuantity float64 `json:"locked_quantity"`
@@ -77,7 +75,7 @@ type InventoryIssuedResp struct {
 	AvailableQuantity float64 `json:"available_quantity"`
 }
 
-type InventorySKULedgerResp struct {
+type InventoryMaterialLedgerResp struct {
 	MaterialID       int64   `json:"material_id"`
 	MaterialName     string  `json:"material_name"`
 	SKUID            int64   `json:"sku_id"`
@@ -93,15 +91,19 @@ type InventorySKULedgerResp struct {
 	HasCustomAttrs   bool    `json:"has_custom_attrs"`
 }
 
-type InventorySKULedgerStatsResp struct {
+type InventoryMaterialLedgerStatsResp struct {
 	TotalAmount       float64 `json:"total_amount"`
 	CodeTotalAmount   float64 `json:"code_total_amount"`
 	NoCodeTotalAmount float64 `json:"no_code_total_amount"`
 	TotalLockedQty    float64 `json:"total_locked_qty"`
 }
 
-type InventorySKUSerialResp struct {
+type InventoryMaterialLedgerSerialResp struct {
 	SerialCode string `json:"serial_code"`
 	Status     string `json:"status"`
 	StatusName string `json:"status_name"`
 }
+
+type InventorySKULedgerResp = InventoryMaterialLedgerResp
+type InventorySKULedgerStatsResp = InventoryMaterialLedgerStatsResp
+type InventorySKUSerialResp = InventoryMaterialLedgerSerialResp

@@ -4,12 +4,10 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { ArrowLeft, FileText, Building2, Calendar, BadgeCheck, Coins } from 'lucide-svelte';
-	import SkuAttrViewer from '$lib/components/SkuAttrViewer.svelte';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
 	let loading = $state(true);
 	let order = $state<any | null>(null);
-	let skuAttrViewer: any = $state(null);
 
 	function formatAmount(amount: number) {
 		return '¥' + (amount || 0).toFixed(2);
@@ -57,14 +55,6 @@
 		loadDetail(id);
 	});
 
-	function viewAttrs(it: any) {
-		if (!it?.sku_id || !skuAttrViewer?.open) return;
-		const title = [it.sku_name, it.sku_code ? `[${it.sku_code}]` : '']
-			.filter(Boolean)
-			.join(' ')
-			.trim();
-		skuAttrViewer.open({ skuId: Number(it.sku_id || 0), title: title || 'SKU属性' });
-	}
 </script>
 
 <div class="space-y-6">
@@ -210,7 +200,7 @@
 				<table class="table-zebra table w-full table-fixed text-base">
 					<thead>
 						<tr>
-							<th class="w-[46%] min-w-[320px]">SKU名称</th>
+							<th class="w-[46%] min-w-[320px]">物料名称</th>
 							<th class="w-24 text-center whitespace-nowrap">属性</th>
 							<th class="w-28 text-right">数量</th>
 							<th class="w-20 text-center">单位</th>
@@ -244,27 +234,13 @@
 												{/if}
 											</div>
 										</div>
-										<div
-											class="text-base-content/60 truncate font-mono text-base"
-											title={item.sku_code ? `${item.sku_code} ${item.sku_name || ''}` : 'SKU: -'}
-										>
-											{#if item.sku_code}
-												{item.sku_code} {item.sku_name || ''}
-											{:else}
-												SKU: -
-											{/if}
+										<div class="text-base-content/60 truncate text-sm">
+											属性 {(item.custom_attributes || []).length} 项
 										</div>
 									</div>
 								</td>
 								<td class="text-center whitespace-nowrap">
-									<button
-										type="button"
-										class="btn btn-xs btn-ghost text-base whitespace-nowrap"
-										onclick={() => viewAttrs(item)}
-										disabled={!item.sku_id}
-									>
-										查看
-									</button>
+									<span class="text-sm">{(item.custom_attributes || []).length}项</span>
 								</td>
 								<td class="text-right font-mono">{item.quantity ?? 0}</td>
 								<td class="text-center">{item.unit || '-'}</td>
@@ -281,5 +257,3 @@
 		</div>
 	{/if}
 </div>
-
-<SkuAttrViewer bind:this={skuAttrViewer} />

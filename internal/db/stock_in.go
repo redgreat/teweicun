@@ -182,8 +182,8 @@ func GetStockInByID(ctx context.Context, id int64) (*response.StockInDetailResp,
 
 	itemQuery := `
 		SELECT sii.id, sii.material_id, m.material_code, m.material_name, m.is_code,
-		       COALESCE(poi.sku_id, sii.sku_id) AS sku_id,
-		       COALESCE(v.sku_code, ''), COALESCE(v.sku_name, ''),
+		       0::bigint AS sku_id,
+		       ''::varchar AS sku_code, ''::varchar AS sku_name,
 		       COALESCE(poi.quantity, sii.arrived_quantity) AS purchase_quantity,
 		       CASE
 		           WHEN COALESCE(sbi.stock_in_type, '') = 'reversal' THEN sii.accepted_quantity
@@ -197,7 +197,6 @@ func GetStockInByID(ctx context.Context, id int64) (*response.StockInDetailResp,
 		JOIN material m ON m.id = sii.material_id
 		LEFT JOIN purchase_order_item poi ON poi.material_id = sii.material_id
 			AND poi.order_id = (SELECT purchase_order_id FROM stock_in WHERE id = $1)
-		LEFT JOIN v_sku_list v ON v.id = COALESCE(poi.sku_id, sii.sku_id)
 		WHERE sii.stock_in_id = $1
 	`
 	rows, err := database.Pool.Query(ctx, itemQuery, id)

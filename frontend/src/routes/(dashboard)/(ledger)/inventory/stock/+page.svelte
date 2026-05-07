@@ -1,12 +1,11 @@
 <!--
-功能：库存台账页面（SKU-仓库-单价维度）
+功能：库存台账页面（物料-仓库-单价维度）
 创建时间：2026-04-18
 创建人：wangcw
 -->
 
 <script lang="ts">
 	import DataGrid from '$lib/components/DataGrid.svelte';
-	import SkuAttrViewer from '$lib/components/SkuAttrViewer.svelte';
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
@@ -14,7 +13,6 @@
 	import { dgToolbarBtn } from '$lib/dgButtonClasses';
 	import { formatDateTimeInCn } from '$lib/datetime';
 
-	let skuAttrViewer: any = $state(null);
 	let items = $state<any[]>([]);
 	let total = $state(0);
 	let loading = $state(true);
@@ -29,7 +27,7 @@
 	});
 
 	let filters = $state({
-		sku_name: '',
+		material_name: '',
 		warehouse_name: '',
 		price_min: '',
 		price_max: ''
@@ -44,7 +42,6 @@
 
 	const columns = [
 		{ key: 'material_name', label: '物料名称', width: '240px' },
-		{ key: 'sku_name', label: 'SKU名称', width: '300px' },
 		{ key: 'warehouse_name', label: '所在仓库', width: '140px' },
 		{ key: 'is_code', label: '是否编码', width: '100px' },
 		{ key: 'quantity', label: '库存数量', width: '110px', class: 'text-right font-mono' },
@@ -80,13 +77,13 @@
 			const params = new URLSearchParams();
 			params.set('page', String(page));
 			params.set('page_size', String(pageSize));
-			if (filters.sku_name.trim()) params.set('sku_name', filters.sku_name.trim());
+			if (filters.material_name.trim()) params.set('material_name', filters.material_name.trim());
 			if (filters.warehouse_name.trim())
 				params.set('warehouse_name', filters.warehouse_name.trim());
 			if (filters.price_min.trim()) params.set('price_min', filters.price_min.trim());
 			if (filters.price_max.trim()) params.set('price_max', filters.price_max.trim());
 
-			const res: any = await api.get(`/inventory/sku-ledger?${params.toString()}`);
+			const res: any = await api.get(`/inventory/material-ledger?${params.toString()}`);
 			items = res.list || [];
 			total = res.total || 0;
 			stats = res.stats || stats;
@@ -96,7 +93,7 @@
 	}
 
 	function resetFilters() {
-		filters = { sku_name: '', warehouse_name: '', price_min: '', price_max: '' };
+		filters = { material_name: '', warehouse_name: '', price_min: '', price_max: '' };
 		loadInventory(1);
 	}
 
@@ -107,13 +104,13 @@
 	async function exportExcel() {
 		try {
 			const params = new URLSearchParams();
-			if (filters.sku_name.trim()) params.set('sku_name', filters.sku_name.trim());
+			if (filters.material_name.trim()) params.set('material_name', filters.material_name.trim());
 			if (filters.warehouse_name.trim())
 				params.set('warehouse_name', filters.warehouse_name.trim());
 			if (filters.price_min.trim()) params.set('price_min', filters.price_min.trim());
 			if (filters.price_max.trim()) params.set('price_max', filters.price_max.trim());
 
-			const blob: Blob = await api.get(`/inventory/sku-ledger/export?${params.toString()}`, {
+			const blob: Blob = await api.get(`/inventory/material-ledger/export?${params.toString()}`, {
 				responseType: 'blob'
 			} as any);
 			const url = window.URL.createObjectURL(blob);
@@ -128,11 +125,6 @@
 		} catch (err: any) {
 			toast.error('导出失败: ' + (err?.message || err));
 		}
-	}
-
-	function viewAttrs(row: any) {
-		if (!row?.sku_id || !skuAttrViewer?.open) return;
-		skuAttrViewer.open({ skuId: Number(row.sku_id), title: row.sku_name || 'SKU属性' });
 	}
 
 	function serialStatusBadgeClass(status: string) {
@@ -157,7 +149,7 @@
 		if (!row?.is_code) return;
 		serialModal = {
 			show: true,
-			title: `${row.material_name} / ${row.sku_name || '-'} / ${row.warehouse_name}`,
+			title: `${row.material_name} / ${row.warehouse_name}`,
 			loading: true,
 			rows: []
 		};
@@ -165,10 +157,9 @@
 			const params = new URLSearchParams({
 				material_id: String(row.material_id),
 				warehouse_id: String(row.warehouse_id),
-				sku_id: String(row.sku_id || 0),
 				unit_cost: String(row.unit_cost || 0)
 			});
-			const res: any = await api.get(`/inventory/sku-ledger/serials?${params.toString()}`);
+			const res: any = await api.get(`/inventory/material-ledger/serials?${params.toString()}`);
 			serialModal = { ...serialModal, loading: false, rows: res || [] };
 		} catch {
 			serialModal = { ...serialModal, loading: false, rows: [] };
@@ -220,8 +211,8 @@
 				<input
 					type="text"
 					class="input bg-base-200 focus:bg-base-100 h-10 min-h-10 w-[12rem] min-w-0 shrink-0 rounded-lg border-none px-3 text-base"
-					placeholder="SKU名称"
-					bind:value={filters.sku_name}
+					placeholder="物料名称/编码"
+					bind:value={filters.material_name}
 					onkeydown={(e) => e.key === 'Enter' && search()}
 				/>
 				<input
@@ -253,7 +244,7 @@
 		{/snippet}
 
 		{#snippet cellRender(key, value, row)}
-			{#if key === 'material_name' || key === 'sku_name'}
+			{#if key === 'material_name'}
 				<div class="block w-full truncate" title={value || '-'}>
 					{value || '-'}
 				</div>
@@ -267,12 +258,7 @@
 				{fmtMoney(value)}
 			{:else if key === 'attrs'}
 				{#if row.has_custom_attrs}
-					<button
-						class="btn btn-xs btn-ghost text-primary"
-						onclick={() => viewAttrs(row)}
-						disabled={!row.sku_id}
-						title="查看SKU属性"
-					>
+					<button class="btn btn-xs btn-ghost text-primary" disabled title="存在自定义属性">
 						<SlidersHorizontal size={14} />
 					</button>
 				{:else}
@@ -296,8 +282,6 @@
 		{/snippet}
 	</DataGrid>
 </div>
-
-<SkuAttrViewer bind:this={skuAttrViewer} />
 
 {#if serialModal.show}
 	<div

@@ -3,7 +3,6 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import SkuAttrViewer from '$lib/components/SkuAttrViewer.svelte';
 	import {
 		ArrowLeft,
 		FileText,
@@ -23,7 +22,6 @@
 
 	let loading = $state(true);
 	let detail = $state<any | null>(null);
-	let skuAttrViewer: any = $state(null);
 
 	let serialModal = $state({ show: false, items: [] as any[], loading: false, title: '' });
 	let confirmLogModal = $state({ show: false, loading: false, items: [] as any[] });
@@ -360,15 +358,6 @@
 		return map[status] || status;
 	}
 
-	function viewAttrs(it: any) {
-		if (!it?.sku_id || !skuAttrViewer?.open) return;
-		const title = [it.sku_name, it.sku_code ? `[${it.sku_code}]` : '']
-			.filter(Boolean)
-			.join(' ')
-			.trim();
-		skuAttrViewer.open({ skuId: Number(it.sku_id || 0), title: title || 'SKU属性' });
-	}
-
 	function lineAmount(it: any) {
 		return (Number(it?.received_quantity) || 0) * (Number(it?.unit_cost) || 0);
 	}
@@ -561,7 +550,7 @@
 					</colgroup>
 					<thead>
 						<tr>
-							<th class="text-left">SKU名称</th>
+							<th class="text-left">物料名称</th>
 							<th class="text-left whitespace-nowrap">属性</th>
 							<th class="text-center">
 								{detail?.stock_in_type === 'reversal' ? '入库数量' : '采购数量'}
@@ -604,29 +593,13 @@
 												{/if}
 											</div>
 										</div>
-										{#if detail?.stock_in_type === 'reversal' && (item.sku_name || item.sku_code)}
-											<div
-												class="text-base-content/50 truncate text-xs"
-												title={`SKU名称 ${item.sku_name || '-'}${item.sku_code ? ` [${item.sku_code}]` : ''}`}
-											>
-												SKU名称
-												{item.sku_name || '-'}
-												{#if item.sku_code}
-													<span class="font-mono">[{item.sku_code}]</span>
-												{/if}
-											</div>
-										{/if}
+										<div class="text-base-content/50 truncate text-xs">
+											属性 {(item.custom_attributes || []).length} 项
+										</div>
 									</div>
 								</td>
 								<td class="whitespace-nowrap">
-									<button
-										type="button"
-										class="btn btn-xs btn-ghost text-base whitespace-nowrap"
-										onclick={() => viewAttrs(item)}
-										disabled={!item.sku_id}
-									>
-										查看
-									</button>
+									<span class="text-sm">{(item.custom_attributes || []).length}项</span>
 								</td>
 								<td class="text-center">
 									<span class="font-mono">{item.purchase_quantity ?? 0}</span>
@@ -679,8 +652,6 @@
 		</div>
 	{/if}
 </div>
-
-<SkuAttrViewer bind:this={skuAttrViewer} />
 
 {#if serialModal.show}
 	<div

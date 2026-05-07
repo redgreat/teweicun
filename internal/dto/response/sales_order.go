@@ -17,7 +17,6 @@ type SalesOrderItemResp struct {
 	MaterialID      int64             `json:"material_id"`
 	MaterialCode    string            `json:"material_code"`
 	MaterialName    string            `json:"material_name"`
-	Specification   string            `json:"specification"`
 	Quantity        float64           `json:"quantity"`
 	UnitPrice       float64           `json:"unit_price"`
 	Amount          float64           `json:"amount"`

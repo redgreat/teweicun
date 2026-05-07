@@ -41,15 +41,14 @@
 	}
 
 	function buildInvOptionLabel(inv: any) {
-		const skuName = inv?.sku_name || inv?.material_name || '';
-		const skuCode = inv?.sku_code || '';
-		const matCode = inv?.material_code || '';
+		const matName = inv?.material_name || inv?.sku_name || '';
+		const matCode = inv?.material_code || inv?.sku_code || '';
 		const wh = inv?.warehouse_name || inv?.warehouse_code || '';
 		const netIssued = formatQty(Number(inv?.issued_quantity ?? 0));
 		const avail = formatQty(Number(inv?.available_quantity ?? 0));
 		const cap = formatQty(invRowCap(inv));
 		const codeTag = inv?.is_code === false ? '无编码' : '有编码';
-		const base = skuName && skuCode ? `${skuName} [${skuCode}]` : skuName || skuCode || '';
+		const base = matName && matCode ? `${matName} [${matCode}]` : matName || matCode || '';
 		return `${base} | ${matCode} | ${codeTag} | 仓库:${wh} | 可退(净):${netIssued} | 可用:${avail} | 上限:${cap}`;
 	}
 
@@ -93,7 +92,7 @@
 		return {
 			inventory_id: 0,
 			material_id: 0,
-			sku_label: '',
+			material_label: '',
 			warehouse_name: '',
 			warehouse_code: '',
 			max_quantity: 0,
@@ -203,7 +202,7 @@
 	function openInvDropdown(index: number, anchor: HTMLInputElement) {
 		invDropdownOpenRow = index;
 		invDropdownAnchor = anchor;
-		invSearchTerm = normalizeInvSearchTerm(form.items[index]?.sku_label || '');
+		invSearchTerm = normalizeInvSearchTerm(form.items[index]?.material_label || '');
 		invOptions = [];
 		invOptionsTotal = 0;
 		invOptionsPage = 1;
@@ -239,7 +238,7 @@
 			max_quantity: maxQty,
 			issued_quantity: issued,
 			available_quantity: avail,
-			sku_label: buildInvOptionLabel(inv),
+			material_label: buildInvOptionLabel(inv),
 			quantity: qty
 		};
 		closeInvDropdown();
@@ -247,7 +246,7 @@
 
 	function onInvInput(index: number) {
 		if (invDropdownOpenRow !== index) return;
-		const val = form.items[index]?.sku_label || '';
+		const val = form.items[index]?.material_label || '';
 		invSearchTerm = normalizeInvSearchTerm(val);
 		if (invSearchTimeout) clearTimeout(invSearchTimeout);
 		invSearchTimeout = setTimeout(() => {
@@ -446,7 +445,7 @@
 							<thead>
 								<tr>
 									<th class="w-10">#</th>
-									<th class="min-w-[360px] lg:min-w-[480px]">SKU 名称</th>
+									<th class="min-w-[360px] lg:min-w-[480px]">物料名称</th>
 									<th class="min-w-[140px]">退货仓库</th>
 									<th class="min-w-[88px] text-right">批次可用</th>
 									<th class="min-w-[88px] text-right">退料上限</th>
@@ -469,9 +468,9 @@
 											>
 												<input
 													type="text"
-													bind:value={item.sku_label}
+													bind:value={item.material_label}
 													class="input input-bordered bg-base-200/50 h-10 w-full min-w-[280px] text-base"
-													placeholder="搜索在库 SKU 名称、物料或编码…"
+													placeholder="搜索在库物料名称或编码…"
 													onfocus={(e) =>
 														openInvDropdown(index, e.currentTarget as HTMLInputElement)}
 													oninput={() => onInvInput(index)}
@@ -587,7 +586,7 @@
 						class="hover:bg-base-200/60 border-base-200 w-full border-b px-3 py-2.5 text-left last:border-b-0"
 						onclick={() => selectInv(invDropdownOpenRow as number, invOpt)}
 					>
-						<div class="text-sm font-medium">{invOpt.sku_name || invOpt.material_name || '-'}</div>
+						<div class="text-sm font-medium">{invOpt.material_name || invOpt.sku_name || '-'}</div>
 						<div class="text-base-content/60 font-mono text-xs">{buildInvOptionLabel(invOpt)}</div>
 					</button>
 				{/each}

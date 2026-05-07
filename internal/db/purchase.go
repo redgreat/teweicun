@@ -164,12 +164,11 @@ func GetPurchaseOrderByID(ctx context.Context, id int64) (*response.PurchaseOrde
 	order.OrderStatusName = getOrderStatusName(order.OrderStatus)
 
 	itemsQuery := `
-		SELECT poi.id, poi.material_id, poi.sku_id, ms.sku_code, ms.sku_name,
+		SELECT poi.id, poi.material_id, NULL::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
 		       m.material_code, m.material_name,
 		       poi.quantity, COALESCE(m.unit, ''), poi.unit_price, poi.amount, poi.received_quantity
 		FROM purchase_order_item poi
 		LEFT JOIN material m ON m.id = poi.material_id
-		LEFT JOIN material_sku ms ON ms.id = poi.sku_id
 		WHERE poi.order_id = $1
 		ORDER BY poi.id
 	`
@@ -257,29 +256,28 @@ func CreatePurchaseOrder(ctx context.Context, req *request.CreatePurchaseOrderRe
 	}
 
 	itemQuery := `
-		INSERT INTO purchase_order_item (order_id, material_id, sku_id, quantity, unit_price, custom_attributes)
-		VALUES ($1, $2, NULLIF($3, 0), $4, $5, $6)
+		INSERT INTO purchase_order_item (order_id, material_id, quantity, unit_price, custom_attributes)
+		VALUES ($1, $2, $3, $4, $5)
 	`
 	for _, item := range req.Items {
 		materialID := item.MaterialID
-		skuID := item.SKUID
 		customAttributes := []byte("[]")
+		if materialID == 0 {
+			return 0, fmt.Errorf("采购订货明细必须选择物料")
+		}
 		if orderType == "purchase" {
-			if skuID == 0 {
-				return 0, fmt.Errorf("采购订货明细必须选择SKU")
-			}
 			err := tx.QueryRow(ctx, `
-				SELECT material_id, COALESCE(custom_attributes, '[]'::jsonb)
-				FROM material_sku WHERE id = $1 AND deleted_at IS NULL
-			`, skuID).Scan(&materialID, &customAttributes)
+				SELECT COALESCE(custom_attributes, '[]'::jsonb)
+				FROM material WHERE id = $1 AND deleted_at IS NULL
+			`, materialID).Scan(&customAttributes)
 			if err != nil {
 				if err == pgx.ErrNoRows {
-					return 0, fmt.Errorf("SKU不存在或已删除")
+					return 0, fmt.Errorf("物料不存在或已删除")
 				}
 				return 0, err
 			}
 		}
-		_, err := tx.Exec(ctx, itemQuery, orderID, materialID, skuID, item.Quantity, item.UnitPrice, customAttributes)
+		_, err := tx.Exec(ctx, itemQuery, orderID, materialID, item.Quantity, item.UnitPrice, customAttributes)
 		if err != nil {
 			return 0, err
 		}
@@ -334,29 +332,28 @@ func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurch
 		}
 
 		itemQuery := `
-			INSERT INTO purchase_order_item (order_id, material_id, sku_id, quantity, unit_price, custom_attributes)
-			VALUES ($1, $2, NULLIF($3, 0), $4, $5, $6)
+			INSERT INTO purchase_order_item (order_id, material_id, quantity, unit_price, custom_attributes)
+			VALUES ($1, $2, $3, $4, $5)
 		`
 		for _, item := range req.Items {
 			materialID := item.MaterialID
-			skuID := item.SKUID
 			customAttributes := []byte("[]")
+			if materialID == 0 {
+				return fmt.Errorf("采购订货明细必须选择物料")
+			}
 			if orderType == "purchase" {
-				if skuID == 0 {
-					return fmt.Errorf("采购订货明细必须选择SKU")
-				}
 				err := tx.QueryRow(ctx, `
-					SELECT material_id, COALESCE(custom_attributes, '[]'::jsonb)
-					FROM material_sku WHERE id = $1 AND deleted_at IS NULL
-				`, skuID).Scan(&materialID, &customAttributes)
+					SELECT COALESCE(custom_attributes, '[]'::jsonb)
+					FROM material WHERE id = $1 AND deleted_at IS NULL
+				`, materialID).Scan(&customAttributes)
 				if err != nil {
 					if err == pgx.ErrNoRows {
-						return fmt.Errorf("SKU不存在或已删除")
+						return fmt.Errorf("物料不存在或已删除")
 					}
 					return err
 				}
 			}
-			_, err := tx.Exec(ctx, itemQuery, id, materialID, skuID, item.Quantity, item.UnitPrice, customAttributes)
+			_, err := tx.Exec(ctx, itemQuery, id, materialID, item.Quantity, item.UnitPrice, customAttributes)
 			if err != nil {
 				return err
 			}

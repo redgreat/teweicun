@@ -95,9 +95,6 @@
 			material_code: '',
 			material_name: '',
 			is_code: false,
-			sku_id: 0,
-			sku_code: '',
-			sku_name: '',
 			warehouse_id: 0,
 			warehouse_code: '',
 			warehouse_name: '',
@@ -202,7 +199,7 @@
 			invOptionsHasMore = newItems.length >= 30;
 		} catch (err) {
 			console.error(err);
-			toast.error('加载有库存的 SKU 失败');
+			toast.error('加载有库存的物料失败');
 		} finally {
 			invOptionsLoading = false;
 		}
@@ -232,10 +229,6 @@
 	}
 
 	function selectInventory(index: number, inv: any) {
-		const skuLabel =
-			inv.sku_code || inv.sku_name
-				? `${inv.sku_code || '-'} ${inv.sku_name ? `· ${inv.sku_name}` : ''}`.trim()
-				: '';
 		const mat = `${inv.material_code || ''} ${inv.material_name || ''}`.trim();
 		form.items[index] = {
 			...form.items[index],
@@ -244,9 +237,6 @@
 			material_code: inv.material_code || '',
 			material_name: inv.material_name || '',
 			is_code: Boolean(inv.is_code),
-			sku_id: inv.sku_id || 0,
-			sku_code: inv.sku_code || '',
-			sku_name: inv.sku_name || '',
 			warehouse_id: inv.warehouse_id,
 			warehouse_code: inv.warehouse_code || '',
 			warehouse_name: inv.warehouse_name || '',
@@ -255,7 +245,7 @@
 			unit_cost: Number(inv.unit_cost ?? 0),
 			quantity: inv.is_code ? 1 : 1,
 			unit: (inv.unit || '').trim() || '件',
-			displaySearch: [skuLabel, mat, inv.warehouse_name].filter(Boolean).join(' · ')
+			displaySearch: [mat, inv.warehouse_name].filter(Boolean).join(' · ')
 		};
 		closeInvDropdown();
 	}
@@ -310,7 +300,7 @@
 		for (let i = 0; i < form.items.length; i++) {
 			const item = form.items[i];
 			if (!item.inventory_id) {
-				toast.error(`第${i + 1}行：请选择 SKU / 库存批次`);
+				toast.error(`第${i + 1}行：请选择物料 / 库存批次`);
 				return;
 			}
 			if (!item.quantity || item.quantity <= 0) {
@@ -459,7 +449,7 @@
 							<thead>
 								<tr>
 									<th class="w-12">#</th>
-									<th class="min-w-[240px]">SKU 名称</th>
+									<th class="min-w-[240px]">物料名称</th>
 									<th class="min-w-[100px]">仓库</th>
 									<th class="min-w-[72px] text-right">在库</th>
 									<th class="min-w-[72px] text-right">可用</th>
@@ -487,7 +477,7 @@
 														openInvDropdown(index, e.currentTarget as HTMLInputElement)}
 													oninput={() => onInvInput(index)}
 													class="input input-bordered bg-base-200/50 h-10 w-full text-base"
-													placeholder="搜索 SKU / 物料 / 仓库…"
+													placeholder="搜索物料 / 仓库…"
 												/>
 											</div>
 										</td>
@@ -597,14 +587,11 @@
 						onclick={() => selectInventory(invDropdownOpenRow as number, inv)}
 					>
 						<div class="text-sm font-medium">
-							{inv.sku_name || inv.material_name || inv.material_code || '—'}
+							{inv.material_name || inv.material_code || '—'}
 						</div>
 						<div class="text-base-content/70 mt-0.5 text-xs">
 							{inv.material_code}
 							{inv.material_name}
-							{#if inv.sku_code}
-								<span class="text-primary ml-1 font-mono">[{inv.sku_code}]</span>
-							{/if}
 						</div>
 						<div class="text-base-content/50 mt-0.5 flex flex-wrap gap-x-2 text-xs">
 							<span>{inv.warehouse_name}</span>

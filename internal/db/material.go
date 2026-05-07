@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/redgreat/teweicun/internal/dto/request"
 	"github.com/redgreat/teweicun/internal/dto/response"
 	"github.com/redgreat/teweicun/pkg/database"
@@ -111,31 +110,16 @@ func CreateMaterial(ctx context.Context, req *request.CreateMaterialReq, userID 
 
 	query := `
 		INSERT INTO material (category_id, material_code, material_name, unit,
-		                      safety_stock, max_stock, is_code, sku_managed, custom_attributes, remark, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		                      safety_stock, max_stock, is_code, custom_attributes, remark, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id
 	`
 	var id int64
 	err = tx.QueryRow(ctx, query,
 		req.CategoryID, materialCode, req.MaterialName, req.Unit,
-		req.SafetyStock, req.MaxStock, req.IsCode, true, customAttrsJSON, req.Remark, userID).Scan(&id)
+		req.SafetyStock, req.MaxStock, req.IsCode, customAttrsJSON, req.Remark, userID).Scan(&id)
 	if err != nil {
 		return 0, err
-	}
-
-	if len(req.CustomAttributes) == 0 {
-		var skuCode string
-		err = tx.QueryRow(ctx, `SELECT fn_generate_sku_code($1)`, id).Scan(&skuCode)
-		if err != nil {
-			return 0, fmt.Errorf("生成默认SKU编码失败: %w", err)
-		}
-		_, err = tx.Exec(ctx, `
-			INSERT INTO material_sku (material_id, sku_code, sku_name, custom_attributes, created_by)
-			VALUES ($1, $2, $3, '[]'::jsonb, $4)
-		`, id, skuCode, req.MaterialName, userID)
-		if err != nil {
-			return 0, fmt.Errorf("生成默认SKU失败: %w", err)
-		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -174,44 +158,17 @@ func UpdateMaterial(ctx context.Context, id int64, req *request.UpdateMaterialRe
 	query := `
 		UPDATE material
 		SET category_id = $1, material_code = $2, material_name = $3, unit = $4,
-		    safety_stock = $5, max_stock = $6, is_code = $7, sku_managed = $8,
-		    custom_attributes = $9, remark = $10, status = $11,
-		    updated_by = $12, updated_at = NOW()
-		WHERE id = $13 AND deleted_at IS NULL
+		    safety_stock = $5, max_stock = $6, is_code = $7,
+		    custom_attributes = $8, remark = $9, status = $10,
+		    updated_by = $11, updated_at = NOW()
+		WHERE id = $12 AND deleted_at IS NULL
 	`
 	_, err := database.Pool.Exec(ctx, query,
 		req.CategoryID, req.MaterialCode, req.MaterialName, req.Unit,
-		req.SafetyStock, req.MaxStock, req.IsCode, true,
+		req.SafetyStock, req.MaxStock, req.IsCode,
 		customAttrsJSON, req.Remark, req.Status, userID, id)
 	if err != nil {
 		return err
-	}
-
-	if len(req.CustomAttributes) == 0 {
-		var cnt int64
-		err := database.Pool.QueryRow(ctx, `
-			SELECT count(*) FROM material_sku WHERE material_id = $1 AND deleted_at IS NULL
-		`, id).Scan(&cnt)
-		if err != nil {
-			if err == pgx.ErrNoRows {
-				return nil
-			}
-			return err
-		}
-		if cnt == 0 {
-			var skuCode string
-			err := database.Pool.QueryRow(ctx, `SELECT fn_generate_sku_code($1)`, id).Scan(&skuCode)
-			if err != nil {
-				return fmt.Errorf("生成默认SKU编码失败: %w", err)
-			}
-			_, err = database.Pool.Exec(ctx, `
-				INSERT INTO material_sku (material_id, sku_code, sku_name, custom_attributes, created_by)
-				VALUES ($1, $2, $3, '[]'::jsonb, $4)
-			`, id, skuCode, req.MaterialName, userID)
-			if err != nil {
-				return fmt.Errorf("生成默认SKU失败: %w", err)
-			}
-		}
 	}
 	return nil
 }

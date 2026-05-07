@@ -20,7 +20,7 @@ import (
 )
 
 type PermissionNode struct {
-	ID       int64           `json:"id"`
+	ID       int64            `json:"id"`
 	Children []PermissionNode `json:"children"`
 }
 
@@ -41,11 +41,6 @@ type Material struct {
 	IsCode       bool   `json:"is_code"`
 }
 
-type SKU struct {
-	ID      int64  `json:"id"`
-	SKUName string `json:"sku_name"`
-}
-
 type PurchaseOrderDetail struct {
 	ID        int64  `json:"id"`
 	StockInID int64  `json:"stock_in_id"`
@@ -53,33 +48,31 @@ type PurchaseOrderDetail struct {
 	Items     []struct {
 		ID         int64   `json:"id"`
 		MaterialID int64   `json:"material_id"`
-		SKUID      *int64  `json:"sku_id"`
 		Quantity   float64 `json:"quantity"`
 	} `json:"items"`
 }
 
 type StockInDetail struct {
-	ID           int64 `json:"id"`
-	StockInNo    string `json:"stock_in_no"`
-	StockInType  string `json:"stock_in_type"`
+	ID            int64  `json:"id"`
+	StockInNo     string `json:"stock_in_no"`
+	StockInType   string `json:"stock_in_type"`
 	StockInStatus string `json:"stock_in_status"`
 	WarehouseCode string `json:"warehouse_code"`
-	Items        []struct {
-		ID         int64   `json:"id"`
-		MaterialID int64   `json:"material_id"`
-		SKUID      int64   `json:"sku_id"`
+	Items         []struct {
+		ID               int64    `json:"id"`
+		MaterialID       int64    `json:"material_id"`
 		ArrivedQuantity  float64  `json:"arrived_quantity"`
 		AcceptedQuantity float64  `json:"accepted_quantity"`
 		UnitCost         *float64 `json:"unit_cost"`
-		IsCode     bool    `json:"is_code"`
+		IsCode           bool     `json:"is_code"`
 	} `json:"items"`
 }
 
 type StockInListRow struct {
-	ID             int64 `json:"id"`
-	PurchaseOrderID int64 `json:"purchase_order_id"`
-	StockInType    string `json:"stock_in_type"`
-	StockInNo      string `json:"stock_in_no"`
+	ID              int64  `json:"id"`
+	PurchaseOrderID int64  `json:"purchase_order_id"`
+	StockInType     string `json:"stock_in_type"`
+	StockInNo       string `json:"stock_in_no"`
 }
 
 type SerialCodeItem struct {
@@ -91,8 +84,6 @@ type InventoryAvailable struct {
 	InventoryID       int64   `json:"inventory_id"`
 	MaterialID        int64   `json:"material_id"`
 	IsCode            bool    `json:"is_code"`
-	SKUID             int64   `json:"sku_id"`
-	SKUName           string  `json:"sku_name"`
 	WarehouseCode     string  `json:"warehouse_code"`
 	Unit              string  `json:"unit"`
 	AvailableQuantity float64 `json:"available_quantity"`
@@ -104,15 +95,15 @@ type ConsumptionOrder struct {
 }
 
 type StockOutDetail struct {
-	ID         int64 `json:"id"`
+	ID         int64  `json:"id"`
 	StockOutNo string `json:"stock_out_no"`
 	Status     string `json:"status"`
 	RefDocType string `json:"ref_doc_type"`
 	Items      []struct {
-		ID       int64   `json:"id"`
-		MaterialID int64 `json:"material_id"`
-		Quantity float64 `json:"quantity"`
-		IsCode   bool    `json:"is_code"`
+		ID         int64   `json:"id"`
+		MaterialID int64   `json:"material_id"`
+		Quantity   float64 `json:"quantity"`
+		IsCode     bool    `json:"is_code"`
 	} `json:"items"`
 }
 
@@ -120,7 +111,6 @@ type InventoryIssued struct {
 	InventoryID    int64   `json:"inventory_id"`
 	MaterialID     int64   `json:"material_id"`
 	IsCode         bool    `json:"is_code"`
-	SKUID          int64   `json:"sku_id"`
 	Unit           string  `json:"unit"`
 	IssuedQuantity float64 `json:"issued_quantity"`
 }
@@ -131,25 +121,23 @@ type ReversalOrder struct {
 }
 
 type ReturnOrder struct {
-	ID         int64  `json:"id"`
-	ReturnNo   string `json:"return_no"`
-	ReturnType string `json:"return_type"`
-	Status     string `json:"status"`
+	ID            int64  `json:"id"`
+	ReturnNo      string `json:"return_no"`
+	ReturnType    string `json:"return_type"`
+	Status        string `json:"status"`
 	WarehouseCode string `json:"warehouse_code"`
 	SupplierCode  string `json:"supplier_code"`
-	StockOutID *int64 `json:"stock_out_id"`
-	Items      []struct {
+	StockOutID    *int64 `json:"stock_out_id"`
+	Items         []struct {
 		InventoryID int64   `json:"inventory_id"`
 		MaterialID  int64   `json:"material_id"`
-		SKUID       int64   `json:"sku_id"`
 		Quantity    float64 `json:"quantity"`
 	} `json:"items,omitempty"`
 }
 
-type InventorySKULedgerRow struct {
+type InventoryMaterialLedgerRow struct {
 	MaterialID    int64   `json:"material_id"`
-	SKUID         int64   `json:"sku_id"`
-	SKUName       string  `json:"sku_name"`
+	MaterialName  string  `json:"material_name"`
 	IsCode        bool    `json:"is_code"`
 	Quantity      float64 `json:"quantity"`
 	WarehouseName string  `json:"warehouse_name"`
@@ -240,11 +228,8 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	warehouseCode := mustEnsureWarehouse(ctx, t, admin, prefix, adminLogin.UserID)
 	categoryID := mustEnsureCategory(ctx, t, admin, prefix)
 
-	// Create materials + SKUs
 	codeMatID := mustCreateMaterial(ctx, t, admin, categoryID, prefix+"_CODE_MAT", true)
 	noCodeMatID := mustCreateMaterial(ctx, t, admin, categoryID, prefix+"_NOCODE_MAT", false)
-	codeSKUID := mustCreateSKU(ctx, t, admin, codeMatID, prefix+"_CODE_SKU")
-	noCodeSKUID := mustCreateSKU(ctx, t, admin, noCodeMatID, prefix+"_NOCODE_SKU")
 
 	// Step 3: role A purchase order (10 + 10) and confirm
 	clientA := admin
@@ -257,7 +242,7 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 		}
 	}
 
-	poID := mustCreatePurchaseOrder(ctx, t, clientA, supplierCode, codeMatID, codeSKUID, noCodeMatID, noCodeSKUID)
+	poID := mustCreatePurchaseOrder(ctx, t, clientA, supplierCode, codeMatID, noCodeMatID)
 	mustConfirm(ctx, t, clientA, fmt.Sprintf("/api/v1/purchase/orders/%d/confirm", poID))
 
 	po := waitPurchaseOrderDetail(ctx, t, clientA, poID, func(p PurchaseOrderDetail) bool { return true })
@@ -316,8 +301,8 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 		}
 	}
 
-	codeInv := mustPickInventoryAvailable(ctx, t, clientB, warehouseCode, codeMatID, codeSKUID, true, 5)
-	noCodeInv := mustPickInventoryAvailable(ctx, t, clientB, warehouseCode, noCodeMatID, noCodeSKUID, false, 5)
+	codeInv := mustPickInventoryAvailable(ctx, t, clientB, warehouseCode, codeMatID, true, 5)
+	noCodeInv := mustPickInventoryAvailable(ctx, t, clientB, warehouseCode, noCodeMatID, false, 5)
 
 	consID := mustCreateConsumptionOrder(ctx, t, clientB, codeInv, 5, noCodeInv, 5)
 	mustConfirm(ctx, t, clientB, fmt.Sprintf("/api/v1/consumption/orders/%d/confirm", consID))
@@ -347,8 +332,8 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	}
 
 	// Step 7: role B create reversal order (return 3 code + 3 nocode) and confirm
-	codeIssued := mustPickInventoryIssued(ctx, t, clientB, warehouseCode, codeMatID, codeSKUID, true, 3)
-	noCodeIssued := mustPickInventoryIssued(ctx, t, clientB, warehouseCode, noCodeMatID, noCodeSKUID, false, 3)
+	codeIssued := mustPickInventoryIssued(ctx, t, clientB, warehouseCode, codeMatID, true, 3)
+	noCodeIssued := mustPickInventoryIssued(ctx, t, clientB, warehouseCode, noCodeMatID, false, 3)
 
 	revID := mustCreateReversalOrder(ctx, t, clientB, codeIssued, 3, noCodeIssued, 3)
 	mustConfirm(ctx, t, clientB, fmt.Sprintf("/api/v1/reversal/orders/%d/confirm", revID))
@@ -726,8 +711,8 @@ func mustCreateMaterial(ctx context.Context, t *testing.T, c *testutil.Client, c
 func mustCreateSKU(ctx context.Context, t *testing.T, c *testutil.Client, materialID int64, skuName string) int64 {
 	t.Helper()
 	req := map[string]any{
-		"material_id": materialID,
-		"sku_name":    skuName,
+		"material_id":     materialID,
+		"sku_name":        skuName,
 		"reference_price": 10,
 		"custom_attributes": []map[string]any{
 			{"attr_code": "color", "attr_name": "颜色", "attr_type": "text", "attr_value": "red"},
@@ -772,21 +757,21 @@ func mustCreateStockInForPurchase(ctx context.Context, t *testing.T, c *testutil
 	items := make([]map[string]any, 0, len(poItems))
 	for _, it := range poItems {
 		items = append(items, map[string]any{
-			"material_id":        it.MaterialID,
-			"purchase_item_id":   it.ID,
-			"arrived_quantity":   it.Quantity,
-			"accepted_quantity":  it.Quantity,
-			"unit_price":         10,
-			"cert_id":            0,
+			"material_id":       it.MaterialID,
+			"purchase_item_id":  it.ID,
+			"arrived_quantity":  it.Quantity,
+			"accepted_quantity": it.Quantity,
+			"unit_price":        10,
+			"cert_id":           0,
 		})
 	}
 	req := map[string]any{
-		"stock_in_date":      today,
-		"stock_in_type":      "purchase",
-		"warehouse_code":     warehouseCode,
-		"purchase_order_id":  purchaseOrderID,
-		"remark":             "e2e stock-in for purchase",
-		"items":              items,
+		"stock_in_date":     today,
+		"stock_in_type":     "purchase",
+		"warehouse_code":    warehouseCode,
+		"purchase_order_id": purchaseOrderID,
+		"remark":            "e2e stock-in for purchase",
+		"items":             items,
 	}
 	var out testutil.IDResp
 	if err := c.DoJSON(ctx, http.MethodPost, "/api/v1/stock-in", nil, req, &out); err != nil {
@@ -867,13 +852,13 @@ func setStockInWarehouseIfEmpty(ctx context.Context, t *testing.T, c *testutil.C
 		}
 		items = append(items, map[string]any{
 			"id":                it.ID,
-			"material_id":        it.MaterialID,
-			"arrived_quantity":   it.ArrivedQuantity,
-			"accepted_quantity":  it.AcceptedQuantity,
-			"unit_cost":          unitCost,
-			"cert_id":            0,
-			"sku_id":             it.SKUID,
-			"custom_attributes":  nil,
+			"material_id":       it.MaterialID,
+			"arrived_quantity":  it.ArrivedQuantity,
+			"accepted_quantity": it.AcceptedQuantity,
+			"unit_cost":         unitCost,
+			"cert_id":           0,
+			"sku_id":            it.SKUID,
+			"custom_attributes": nil,
 		})
 	}
 	req := map[string]any{
@@ -909,10 +894,10 @@ func mustCreateConsumptionOrder(ctx context.Context, t *testing.T, c *testutil.C
 	t.Helper()
 	today := time.Now().Format("2006-01-02")
 	req := map[string]any{
-		"project_no":    "E2E-" + today,
-		"product_name":  "E2E Product " + today,
-		"order_date":    today,
-		"remark":        "e2e consumption",
+		"project_no":   "E2E-" + today,
+		"product_name": "E2E Product " + today,
+		"order_date":   today,
+		"remark":       "e2e consumption",
 		"items": []map[string]any{
 			{"material_id": codeInv.MaterialID, "inventory_id": codeInv.InventoryID, "quantity": codeQty, "unit": codeInv.Unit, "remark": "code"},
 			{"material_id": noCodeInv.MaterialID, "inventory_id": noCodeInv.InventoryID, "quantity": noCodeQty, "unit": noCodeInv.Unit, "remark": "nocode"},
@@ -966,10 +951,10 @@ func mustCreateReversalOrder(ctx context.Context, t *testing.T, c *testutil.Clie
 	t.Helper()
 	today := time.Now().Format("2006-01-02")
 	req := map[string]any{
-		"project_no":    "E2E-" + today,
-		"product_name":  "E2E Product " + today,
-		"order_date":    today,
-		"remark":        "e2e reversal",
+		"project_no":   "E2E-" + today,
+		"product_name": "E2E Product " + today,
+		"order_date":   today,
+		"remark":       "e2e reversal",
 		"items": []map[string]any{
 			{"inventory_id": codeInv.InventoryID, "material_id": codeInv.MaterialID, "quantity": codeQty, "unit": codeInv.Unit, "remark": "code"},
 			{"inventory_id": noCodeInv.InventoryID, "material_id": noCodeInv.MaterialID, "quantity": noCodeQty, "unit": noCodeInv.Unit, "remark": "nocode"},
@@ -1082,4 +1067,3 @@ func asInt64(v any) (int64, bool) {
 		return 0, false
 	}
 }
-

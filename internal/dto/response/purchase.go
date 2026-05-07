@@ -50,7 +50,6 @@ type PurchaseOrderItemResp struct {
 	SKUName          *string             `json:"sku_name"`
 	MaterialCode     string              `json:"material_code"`
 	MaterialName     string              `json:"material_name"`
-	Specification    string              `json:"specification"`
 	Quantity         float64             `json:"quantity"`
 	Unit             string              `json:"unit"`
 	UnitPrice        *float64            `json:"unit_price"`

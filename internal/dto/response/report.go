@@ -11,7 +11,6 @@ type StockInSummaryReport struct {
 	SupplierName  string  `json:"supplier_name"`
 	MaterialCode  string  `json:"material_code"`
 	MaterialName  string  `json:"material_name"`
-	Specification string  `json:"specification"`
 	Unit          string  `json:"unit"`
 	TotalQuantity float64 `json:"total_quantity"`
 	OrderCount    int     `json:"order_count"`
@@ -22,7 +21,6 @@ type StockOutSummaryReport struct {
 	OutType       string  `json:"out_type"`
 	MaterialCode  string  `json:"material_code"`
 	MaterialName  string  `json:"material_name"`
-	Specification string  `json:"specification"`
 	Unit          string  `json:"unit"`
 	TotalQuantity float64 `json:"total_quantity"`
 	OrderCount    int     `json:"order_count"`
@@ -33,7 +31,6 @@ type InventoryStatusReport struct {
 	CategoryName      string  `json:"category_name"`
 	MaterialCode      string  `json:"material_code"`
 	MaterialName      string  `json:"material_name"`
-	Specification     string  `json:"specification"`
 	Unit              string  `json:"unit"`
 	CurrentQuantity   float64 `json:"current_quantity"`
 	LockedQuantity    float64 `json:"locked_quantity"`

@@ -285,14 +285,13 @@ func GetReversalOrderDetail(ctx context.Context, id int64) (*response.ReversalOr
 	itemQuery := `
 		SELECT 
 			roi.id, roi.order_id, roi.material_id, m.material_code, m.material_name,
-			COALESCE(inv.sku_id, 0), COALESCE(v.sku_code, ''), COALESCE(v.sku_name, ''),
+			0::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
 			roi.quantity, roi.unit, COALESCE(inv.unit_cost, 0),
 			COALESCE(roi.remark, ''), COALESCE(w.warehouse_name, '')
 		FROM reversal_order_item roi
 		INNER JOIN material m ON m.id = roi.material_id
 		LEFT JOIN inventory inv ON inv.id = roi.inventory_id
 		LEFT JOIN warehouse w ON w.id = inv.warehouse_id
-		LEFT JOIN v_sku_list v ON v.id = inv.sku_id
 		WHERE roi.order_id = $1
 	`
 	rows, err := database.Pool.Query(ctx, itemQuery, id)

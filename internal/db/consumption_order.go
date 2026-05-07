@@ -395,13 +395,12 @@ func GetConsumptionOrderDetail(ctx context.Context, id int64) (*response.Consump
 	itemQuery := `
 		SELECT 
 			coi.id, coi.order_id, coi.material_id, m.material_code, m.material_name,
-			coi.inventory_id, COALESCE(i.sku_id, 0), COALESCE(v.sku_code, ''), COALESCE(v.sku_name, ''),
+			coi.inventory_id, 0::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
 			coi.quantity, coi.unit, COALESCE(i.unit_cost, 0),
 			COALESCE(coi.remark, '')
 		FROM consumption_order_item coi
 		INNER JOIN material m ON m.id = coi.material_id
 		LEFT JOIN inventory i ON i.id = coi.inventory_id
-		LEFT JOIN v_sku_list v ON v.id = i.sku_id
 		WHERE coi.order_id = $1
 	`
 	rows, err := database.Pool.Query(ctx, itemQuery, id)

@@ -13,7 +13,6 @@ type StockTransferItemResp struct {
 	MaterialID   int64   `json:"material_id"`
 	MaterialCode string  `json:"material_code"`
 	MaterialName string  `json:"material_name"`
-	Specification string `json:"specification"`
 	Quantity     float64 `json:"quantity"`
 	Unit         string  `json:"unit"`
 	Remark       string  `json:"remark"`

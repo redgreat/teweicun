@@ -37,3 +37,5 @@ config/config.yaml
 .claude/
 .gemini/
 .codeartsdoer/
+.trae/
+.cursor/

@@ -9,7 +9,6 @@
 	import { page } from '$app/stores';
 	import { ArrowLeft, Plus, Trash2, Calendar, Building2 } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
-	import SkuAttrViewer from '$lib/components/SkuAttrViewer.svelte';
 	import { formatDateInCn, todayDateInCn } from '$lib/datetime';
 
 	let suppliers = $state<any[]>([]);
@@ -39,8 +38,6 @@
 	});
 
 	let submitting = $state(false);
-	let skuAttrViewer: any = $state(null);
-
 	async function loadSuppliers() {
 		try {
 			const res: any = await api.get('/base/suppliers?page=1&page_size=100');
@@ -52,8 +49,8 @@
 	}
 
 	function buildSkuOptionLabel(sku: any) {
-		const name = sku?.sku_name || sku?.material_name || '';
-		const code = sku?.sku_code || '';
+		const name = sku?.material_name || sku?.sku_name || '';
+		const code = sku?.material_code || sku?.sku_code || '';
 		if (name && code) return `${name} [${code}]`;
 		return name || code || '';
 	}
@@ -110,10 +107,10 @@
 
 		skuOptionsLoading = true;
 		try {
-			let url = `/base/skus?page=${nextPage}&page_size=50&status=enabled`;
+			let url = `/base/materials?page=${nextPage}&page_size=50&status=enabled`;
 			const q = skuSearchTerm.trim();
 			if (q) {
-				url += `&sku_name=${encodeURIComponent(q)}`;
+				url += `&material_name=${encodeURIComponent(q)}`;
 			}
 			const res: any = await api.get(url);
 			const list = res.list || [];
@@ -190,8 +187,7 @@
 	function buildItem() {
 		return {
 			material_id: 0,
-			sku_id: 0,
-			sku_label: '',
+			material_label: '',
 			quantity: 1,
 			unit: '',
 			unit_price: 0,
@@ -210,7 +206,7 @@
 	function openSkuDropdown(index: number, anchor: HTMLInputElement) {
 		skuDropdownOpenRow = index;
 		skuDropdownAnchor = anchor;
-		skuSearchTerm = normalizeSkuSearchTerm(form.items[index]?.sku_label || '');
+		skuSearchTerm = normalizeSkuSearchTerm(form.items[index]?.material_label || '');
 		skuOptions = [];
 		skuOptionsTotal = 0;
 		skuOptionsPage = 1;
@@ -229,10 +225,10 @@
 	function onSkuInput(index: number) {
 		const item = form.items[index];
 		skuDropdownOpenRow = index;
-		skuSearchTerm = normalizeSkuSearchTerm(item?.sku_label || '');
+		skuSearchTerm = normalizeSkuSearchTerm(item?.material_label || '');
 		if (item) {
-			item.sku_id = 0;
 			item.material_id = 0;
+			item.custom_attributes = [];
 		}
 		if (skuSearchTimeout) clearTimeout(skuSearchTimeout);
 		skuSearchTimeout = setTimeout(() => {
@@ -248,17 +244,18 @@
 		const item = form.items[index];
 		if (!item) return;
 		if (
-			form.items.some((it: any, idx: number) => idx !== index && it.sku_id && it.sku_id === sku.id)
+			form.items.some(
+				(it: any, idx: number) => idx !== index && it.material_id && it.material_id === sku.id
+			)
 		) {
-			toast.warning('该 SKU 已添加，不能重复');
+			toast.warning('该物料已添加，不能重复');
 			return;
 		}
-		item.sku_id = sku.id;
-		item.material_id = sku.material_id;
-		item.sku_label = buildSkuOptionLabel(sku);
+		item.material_id = sku.id;
+		item.material_label = buildSkuOptionLabel(sku);
 		item.custom_attributes = sku.custom_attributes || [];
 		if (!item.unit) {
-			item.unit = sku.unit || '';
+			item.unit = sku.unit_name || sku.unit || '';
 		}
 		if (!item.unit_price || Number(item.unit_price) === 0) {
 			item.unit_price = Number(sku.reference_price || 0);
@@ -279,15 +276,6 @@
 		return '¥' + (amount || 0).toFixed(2);
 	}
 
-	function viewAttrs(item: any) {
-		if (!item?.sku_id || !skuAttrViewer?.open) return;
-		skuAttrViewer.open({
-			skuId: Number(item.sku_id || 0),
-			title: item.sku_label || 'SKU属性',
-			attrs: item.custom_attributes || []
-		});
-	}
-
 	async function loadOrder(id: number) {
 		try {
 			const detail: any = await api.get(`/purchase/orders/${id}`);
@@ -297,16 +285,15 @@
 				return;
 			}
 			const itemList = (detail.items || []).map((item: any) => {
-				const skuName = item.sku_name || '';
-				const skuCode = item.sku_code || '';
+				const skuName = item.material_name || item.sku_name || '';
+				const skuCode = item.material_code || item.sku_code || '';
 				const skuLabel =
 					skuName && skuCode
 						? `${skuName} [${skuCode}]`
 						: skuName || (skuCode ? `[${skuCode}]` : '');
 				return {
 					material_id: item.material_id || 0,
-					sku_id: item.sku_id || 0,
-					sku_label: skuLabel,
+					material_label: skuLabel,
 					quantity: item.quantity || 1,
 					unit: item.unit || '',
 					unit_price: Number(item.unit_price || 0),
@@ -346,21 +333,17 @@
 			toast.error('请添加采购明细');
 			return;
 		}
-		const skuSet = new Set<number>();
+		const materialSet = new Set<number>();
 		for (const item of form.items) {
-			if (!item.sku_id) {
-				toast.error('存在未选择 SKU 的明细行');
-				return;
-			}
-			if (skuSet.has(Number(item.sku_id))) {
-				toast.error('SKU 明细存在重复，请去重');
-				return;
-			}
-			skuSet.add(Number(item.sku_id));
 			if (!item.material_id) {
-				toast.error('存在无效 SKU 的明细行');
+				toast.error('存在未选择物料的明细行');
 				return;
 			}
+			if (materialSet.has(Number(item.material_id))) {
+				toast.error('物料明细存在重复，请去重');
+				return;
+			}
+			materialSet.add(Number(item.material_id));
 			if (!item.unit) {
 				toast.error('存在未填写单位的明细行');
 				return;
@@ -376,7 +359,6 @@
 				remark: form.remark,
 				items: form.items.map((item: any) => ({
 					material_id: item.material_id,
-					sku_id: item.sku_id,
 					quantity: Number(item.quantity || 0),
 					unit_price: Number(item.unit_price || 0)
 				}))
@@ -515,7 +497,7 @@
 						<table class="table-zebra table w-full text-[15px]">
 							<thead>
 								<tr>
-									<th class="min-w-[320px] lg:min-w-[420px]">SKU名称</th>
+									<th class="min-w-[320px] lg:min-w-[420px]">物料名称</th>
 									<th class="min-w-[100px]">属性</th>
 									<th class="min-w-[100px]">数量</th>
 									<th class="min-w-[100px]">单位</th>
@@ -535,23 +517,16 @@
 											>
 												<input
 													type="text"
-													bind:value={item.sku_label}
+													bind:value={item.material_label}
 													class="input input-sm input-bordered bg-base-200/50 w-full min-w-[280px]"
-													placeholder="输入 SKU 名称搜索…"
+													placeholder="输入物料名称搜索…"
 													onfocus={(e) => openSkuDropdown(i, e.currentTarget as HTMLInputElement)}
 													oninput={() => onSkuInput(i)}
 												/>
 											</div>
 										</td>
 										<td>
-											<button
-												type="button"
-												class="btn btn-xs btn-ghost"
-												onclick={() => viewAttrs(item)}
-												disabled={!item.sku_id}
-											>
-												查看
-											</button>
+											<span class="text-sm">{(item.custom_attributes || []).length}项</span>
 										</td>
 										<td>
 											<input
@@ -614,8 +589,6 @@
 	</div>
 </div>
 
-<SkuAttrViewer bind:this={skuAttrViewer} />
-
 {#if skuDropdownOpenRow !== null}
 	<div class="fixed inset-0 z-[70]" role="presentation" onclick={closeSkuDropdown}></div>
 	<div
@@ -636,7 +609,7 @@
 			onscroll={onSkuOptionsScroll}
 		>
 			{#if skuOptions.length === 0 && !skuOptionsLoading}
-				<div class="text-base-content/50 p-4 text-sm">无匹配 SKU</div>
+				<div class="text-base-content/50 p-4 text-sm">无匹配物料</div>
 			{:else}
 				{#each skuOptions as skuOpt}
 					<button
@@ -644,7 +617,7 @@
 						class="hover:bg-base-200/60 border-base-200 w-full border-b px-3 py-2.5 text-left last:border-b-0"
 						onclick={() => selectSku(skuDropdownOpenRow as number, skuOpt)}
 					>
-						<div class="text-sm font-medium">{skuOpt.sku_name || '-'}</div>
+						<div class="text-sm font-medium">{skuOpt.material_name || '-'}</div>
 						<div class="text-base-content/60 font-mono text-xs">{buildSkuOptionLabel(skuOpt)}</div>
 					</button>
 				{/each}

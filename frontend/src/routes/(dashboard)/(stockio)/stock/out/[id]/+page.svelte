@@ -9,7 +9,6 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import SkuAttrViewer from '$lib/components/SkuAttrViewer.svelte';
 	import {
 		ArrowLeft,
 		FileText,
@@ -28,7 +27,6 @@
 	let loading = $state(true);
 	let confirming = $state(false);
 	let detail = $state<any | null>(null);
-	let skuAttrViewer: any = $state(null);
 	let selectionSaving = $state(false);
 	let pickerLoading = $state(false);
 	let pickerOpen = $state(false);
@@ -348,15 +346,6 @@
 		return map[status] || status;
 	}
 
-	function viewAttrs(it: any) {
-		if (!it?.sku_id || !skuAttrViewer?.open) return;
-		const title = [it.sku_name, it.sku_code ? `[${it.sku_code}]` : '']
-			.filter(Boolean)
-			.join(' ')
-			.trim();
-		skuAttrViewer.open({ skuId: Number(it.sku_id || 0), title: title || 'SKU属性' });
-	}
-
 	onMount(() => {
 		const id = Number($page.params.id);
 		if (!id) {
@@ -522,7 +511,7 @@
 				<table class="table-zebra table w-full table-fixed text-base">
 					<thead>
 						<tr>
-							<th class="w-[34%] min-w-[320px]">SKU名称</th>
+							<th class="w-[34%] min-w-[320px]">物料名称</th>
 							<th class="min-w-[160px]">出库仓库</th>
 							<th class="w-24 whitespace-nowrap">属性</th>
 							<th class="min-w-[120px]">数量</th>
@@ -561,29 +550,14 @@
 												{/if}
 											</div>
 										</div>
-										{#if it.sku_name || it.sku_code}
-											<div
-												class="text-base-content/60 truncate font-mono text-base"
-												title={`${it.sku_name || ''}${it.sku_code ? ` [${it.sku_code}]` : ''}`}
-											>
-												{it.sku_name || ''}
-												{#if it.sku_code}
-													<span class="ml-1">[{it.sku_code}]</span>
-												{/if}
-											</div>
-										{/if}
+										<div class="text-base-content/60 truncate text-sm">
+											属性 {(it.custom_attributes || []).length} 项
+										</div>
 									</div>
 								</td>
 								<td>{it.warehouse_name || it.warehouse_code || detail.warehouse_name || '-'}</td>
 								<td class="whitespace-nowrap">
-									<button
-										type="button"
-										class="btn btn-xs btn-ghost text-base whitespace-nowrap"
-										onclick={() => viewAttrs(it)}
-										disabled={!it.sku_id}
-									>
-										查看
-									</button>
+									<span class="text-sm">{(it.custom_attributes || []).length}项</span>
 								</td>
 								<td class="font-mono">{it.quantity ?? 0}</td>
 								<td>{it.unit || '-'}</td>
@@ -632,8 +606,6 @@
 		</div>
 	{/if}
 </div>
-
-<SkuAttrViewer bind:this={skuAttrViewer} />
 
 {#if pickerOpen}
 	<div
