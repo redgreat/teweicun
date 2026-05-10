@@ -10,7 +10,7 @@
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
-	import { FolderTree, Plus, FolderOpen, ChevronRight, Edit3, Trash2 } from 'lucide-svelte';
+	import { FolderTree, Plus, FolderOpen, ChevronRight, Pencil, Trash2 } from 'lucide-svelte';
 
 	let categories = $state<any[]>([]);
 	let loading = $state(true);
@@ -224,17 +224,19 @@
 			<div
 				class="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100"
 			>
-				<button
-					class="btn btn-sm btn-ghost text-primary hover:bg-primary/10 rounded-md"
-					onclick={() => openCreateModal(node.id)}
-				>
-					<Plus size={15} /> 子分类
-				</button>
+				{#if depth < 1}
+					<button
+						class="btn btn-sm btn-ghost text-primary hover:bg-primary/10 rounded-md"
+						onclick={() => openCreateModal(node.id)}
+					>
+						<Plus size={15} /> 子分类
+					</button>
+				{/if}
 				<button
 					class="btn btn-sm btn-ghost hover:bg-base-200 rounded-md"
 					onclick={() => openEditModal(node)}
 				>
-					<Edit3 size={15} />
+					<Pencil size={15} />
 				</button>
 				<button
 					class="btn btn-sm btn-ghost text-error hover:bg-error/10 rounded-md"
@@ -295,12 +297,21 @@
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
 				<label class="label"><span class="label-text">排序号</span></label>
-				<input
-					type="number"
-					bind:value={form.sort_order}
-					class="input input-bordered bg-base-200/50 w-full"
-					min="1"
-				/>
+				{#if editingId}
+					<input
+						type="number"
+						bind:value={form.sort_order}
+						class="input input-bordered bg-base-200/50 w-full"
+						min="1"
+					/>
+				{:else}
+					<input
+						type="text"
+						value="系统自动按同级最大值 + 1"
+						class="input input-bordered bg-base-200/50 w-full"
+						disabled
+					/>
+				{/if}
 			</div>
 			<div class="form-control">
 				<label class="label"><span class="label-text">上级分类</span></label>

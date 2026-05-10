@@ -1,5 +1,5 @@
 services:
-  app:
+  twc:
     image: ghcr.io/redgreat/teweicun:latest
     container_name: twc
     hostname: twc

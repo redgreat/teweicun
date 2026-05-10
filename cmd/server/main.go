@@ -175,17 +175,9 @@ func main() {
 
 			// Material Routes
 			protected.GET("/base/materials", handler.ListMaterials)
+			protected.GET("/base/materials/:id", handler.GetMaterial)
 			protected.POST("/base/materials", handler.CreateMaterial)
 			protected.PUT("/base/materials/:id", handler.UpdateMaterial)
-			protected.DELETE("/base/materials/:id", handler.DeleteMaterial)
-			protected.GET("/base/materials/:id/attributes", handler.GetMaterialAttributes)
-			protected.PUT("/base/materials/:id/attributes", handler.UpdateMaterialAttributes)
-
-			// Material Attribute Routes
-			protected.GET("/base/material-attributes", handler.ListMaterialAttributeDefs)
-			protected.POST("/base/material-attributes", handler.CreateMaterialAttributeDef)
-			protected.PUT("/base/material-attributes/:id", handler.UpdateMaterialAttributeDef)
-			protected.DELETE("/base/material-attributes/:id", handler.DeleteMaterialAttributeDef)
 
 			// Supplier Routes
 			protected.GET("/base/suppliers", handler.ListSuppliers)

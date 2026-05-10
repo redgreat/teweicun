@@ -22,14 +22,12 @@ echo "✓ Token获取成功"
 echo ""
 
 echo "2. 创建采购订单..."
-echo "   获取一个可用SKU..."
-SKU_RESPONSE=$(curl -s -X GET "$BASE_URL/base/skus?page=1&page_size=1&status=enabled" \
+echo "   获取一个可用物料..."
+MATERIAL_RESPONSE=$(curl -s -X GET "$BASE_URL/base/materials?page=1&page_size=1" \
   -H "Authorization: Bearer $TOKEN")
-SKU_ID=$(echo "$SKU_RESPONSE" | jq -r '.data.list[0].id')
-MATERIAL_ID=$(echo "$SKU_RESPONSE" | jq -r '.data.list[0].material_id')
-SKU_NAME=$(echo "$SKU_RESPONSE" | jq -r '.data.list[0].sku_name')
-SKU_CODE=$(echo "$SKU_RESPONSE" | jq -r '.data.list[0].sku_code')
-echo "✓ SKU: $SKU_NAME [$SKU_CODE], sku_id=$SKU_ID, material_id=$MATERIAL_ID"
+MATERIAL_ID=$(echo "$MATERIAL_RESPONSE" | jq -r '.data.list[0].id')
+MATERIAL_NAME=$(echo "$MATERIAL_RESPONSE" | jq -r '.data.list[0].material_name')
+echo "✓ 物料: $MATERIAL_NAME, material_id=$MATERIAL_ID"
 CREATE_RESPONSE=$(curl -s -X POST "$BASE_URL/purchase/orders" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
@@ -41,7 +39,6 @@ CREATE_RESPONSE=$(curl -s -X POST "$BASE_URL/purchase/orders" \
     "items": [
       {
         "material_id": '"$MATERIAL_ID"',
-        "sku_id": '"$SKU_ID"',
         "quantity": 50,
         "unit": "件",
         "unit_price": 100.00,

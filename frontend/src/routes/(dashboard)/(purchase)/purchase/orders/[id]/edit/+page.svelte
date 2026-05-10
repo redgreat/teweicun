@@ -49,8 +49,8 @@
 	}
 
 	function buildSkuOptionLabel(sku: any) {
-		const name = sku?.material_name || sku?.sku_name || '';
-		const code = sku?.material_code || sku?.sku_code || '';
+		const name = sku?.material_display_name || sku?.material_name || '';
+		const code = sku?.material_code || '';
 		if (name && code) return `${name} [${code}]`;
 		return name || code || '';
 	}
@@ -285,15 +285,15 @@
 				return;
 			}
 			const itemList = (detail.items || []).map((item: any) => {
-				const skuName = item.material_name || item.sku_name || '';
-				const skuCode = item.material_code || item.sku_code || '';
-				const skuLabel =
-					skuName && skuCode
-						? `${skuName} [${skuCode}]`
-						: skuName || (skuCode ? `[${skuCode}]` : '');
+				const matName = item.material_name || '';
+				const matCode = item.material_code || '';
+				const matLabel =
+					matName && matCode
+						? `${matName} [${matCode}]`
+						: matName || (matCode ? `[${matCode}]` : '');
 				return {
 					material_id: item.material_id || 0,
-					material_label: skuLabel,
+					material_label: matLabel,
 					quantity: item.quantity || 1,
 					unit: item.unit || '',
 					unit_price: Number(item.unit_price || 0),

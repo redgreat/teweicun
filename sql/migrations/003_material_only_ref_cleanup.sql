@@ -1,8 +1,12 @@
 -- 功能：物料单模型改造第三步（清理业务表 SKU 外键字段）
 -- 创建时间：2026-05-07
 -- 创建人：GPT-5.3-Codex
+-- MIGRATION_ID: 003_material_only_ref_cleanup
+-- MIGRATION_APPLIED: applied_20260510T110430
 
 BEGIN;
+
+DROP VIEW IF EXISTS v_inventory_detail;
 
 UPDATE purchase_order_item
 SET custom_attributes = '[]'::jsonb

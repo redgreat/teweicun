@@ -11,6 +11,7 @@ type MaterialQuery struct {
 	MaterialCode string `form:"material_code"`
 	MaterialName string `form:"material_name"`
 	CategoryID   int64  `form:"category_id"`
+	Unit         string `form:"unit"`
 	Status       string `form:"status"`
 }
 
@@ -42,10 +43,6 @@ type UpdateMaterialReq struct {
 }
 
 type CustomAttributeItem struct {
-	AttrID    int64  `json:"attr_id"`
-	AttrCode  string `json:"attr_code"`
 	AttrName  string `json:"attr_name"`
-	AttrType  string `json:"attr_type"`
-	AttrUnit  string `json:"attr_unit"`
 	AttrValue string `json:"attr_value"`
 }

@@ -5,7 +5,7 @@
 # 创建人：CodeArts Agent
 #
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -19,12 +19,25 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
-DB_HOST=$(grep -A 10 "database:" "$CONFIG_FILE" | grep "host:" | awk '{print $2}')
-DB_PORT=$(grep -A 10 "database:" "$CONFIG_FILE" | grep "port:" | awk '{print $2}')
-DB_NAME=$(grep -A 10 "database:" "$CONFIG_FILE" | grep "dbname:" | awk '{print $2}')
-DB_USER=$(grep -A 10 "database:" "$CONFIG_FILE" | grep "user:" | awk '{print $2}')
-DB_PASSWORD=$(grep -A 10 "database:" "$CONFIG_FILE" | grep "password:" | awk '{print $2}')
-DB_SSLMODE=$(grep -A 10 "database:" "$CONFIG_FILE" | grep "sslmode:" | awk '{print $2}')
+get_db_field() {
+    local field="$1"
+    awk -F': *' -v key="$field" '
+        $1 == "database" { in_db=1; next }
+        in_db && $0 ~ /^[^[:space:]]/ { in_db=0 }
+        in_db && $1 ~ ("^[[:space:]]*" key "$") {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2);
+            print $2;
+            exit;
+        }
+    ' "$CONFIG_FILE"
+}
+
+DB_HOST=$(get_db_field "host")
+DB_PORT=$(get_db_field "port")
+DB_NAME=$(get_db_field "dbname")
+DB_USER=$(get_db_field "user")
+DB_PASSWORD=$(get_db_field "password")
+DB_SSLMODE=$(get_db_field "sslmode")
 
 if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USER" ]; then
     echo "错误: 无法从配置文件读取数据库连接信息"
@@ -47,11 +60,14 @@ if [ ! -d "$MIGRATION_DIR" ]; then
     exit 1
 fi
 
-echo "可用的迁移脚本:"
-ls -1 "$MIGRATION_DIR"/*.sql 2>/dev/null | while read file; do
-    echo "  - $(basename "$file")"
-done
-echo ""
+MIGRATION_FILES=()
+while IFS= read -r file; do
+    MIGRATION_FILES+=("$file")
+done < <(ls -1 "$MIGRATION_DIR"/*.sql 2>/dev/null | sort)
+if [ ${#MIGRATION_FILES[@]} -eq 0 ]; then
+    echo "错误: 未找到迁移脚本"
+    exit 1
+fi
 
 AUTO_YES=0
 if [ "$1" = "-y" ] || [ "$1" = "--yes" ]; then
@@ -71,27 +87,78 @@ echo ""
 echo "开始执行迁移..."
 echo ""
 
-for migration_file in "$MIGRATION_DIR"/*.sql; do
-    if [ -f "$migration_file" ]; then
-        filename=$(basename "$migration_file")
-        echo "执行: $filename"
-        
-        export PGPASSWORD="$DB_PASSWORD"
-        if [ -n "$DB_SSLMODE" ]; then
-            export PGSSLMODE="$DB_SSLMODE"
-        fi
-        psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$migration_file" 2>&1 | while read line; do
-            echo "  $line"
-        done
-        
-        if [ ${PIPESTATUS[0]} -eq 0 ]; then
-            echo "  ✓ 成功"
-        else
-            echo "  ✗ 失败"
-            exit 1
-        fi
-        echo ""
+export PGPASSWORD="$DB_PASSWORD"
+if [ -n "$DB_SSLMODE" ]; then
+    export PGSSLMODE="$DB_SSLMODE"
+fi
+
+PSQL_BASE_CMD=(psql -v ON_ERROR_STOP=1 -X -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME")
+
+"${PSQL_BASE_CMD[@]}" -c "
+CREATE TABLE IF NOT EXISTS schema_migration_history (
+    migration_id varchar(255) PRIMARY KEY,
+    filename varchar(255) NOT NULL,
+    file_checksum varchar(128) NOT NULL,
+    applied_at timestamp with time zone NOT NULL DEFAULT NOW()
+);
+"
+
+echo "可用的迁移脚本:"
+for migration_file in "${MIGRATION_FILES[@]}"; do
+    filename=$(basename "$migration_file")
+    migration_id=$(grep -E '^--[[:space:]]*MIGRATION_ID:' "$migration_file" | head -n 1 | sed -E 's/^--[[:space:]]*MIGRATION_ID:[[:space:]]*//')
+    if [ -z "$migration_id" ]; then
+        echo "错误: $filename 缺少头部标识 '-- MIGRATION_ID:'"
+        exit 1
     fi
+    echo "  - $filename  ($migration_id)"
+done
+echo ""
+
+for migration_file in "${MIGRATION_FILES[@]}"; do
+    filename=$(basename "$migration_file")
+    migration_id=$(grep -E '^--[[:space:]]*MIGRATION_ID:' "$migration_file" | head -n 1 | sed -E 's/^--[[:space:]]*MIGRATION_ID:[[:space:]]*//')
+    escaped_id=$(printf "%s" "$migration_id" | sed "s/'/''/g")
+    applied=$("${PSQL_BASE_CMD[@]}" -t -A -c "SELECT 1 FROM schema_migration_history WHERE migration_id = '$escaped_id' LIMIT 1;")
+
+    if [ "$applied" = "1" ]; then
+        echo "跳过: $filename ($migration_id) 已执行"
+        echo ""
+        continue
+    fi
+
+    echo "执行: $filename ($migration_id)"
+    output_file="$(mktemp)"
+    if "${PSQL_BASE_CMD[@]}" -f "$migration_file" >"$output_file" 2>&1; then
+        while IFS= read -r line; do
+            echo "  $line"
+        done <"$output_file"
+
+        checksum=$(shasum -a 256 "$migration_file" | awk '{print $1}')
+        escaped_filename=$(printf "%s" "$filename" | sed "s/'/''/g")
+        escaped_checksum=$(printf "%s" "$checksum" | sed "s/'/''/g")
+        "${PSQL_BASE_CMD[@]}" -c "
+            INSERT INTO schema_migration_history (migration_id, filename, file_checksum)
+            VALUES ('$escaped_id', '$escaped_filename', '$escaped_checksum')
+            ON CONFLICT (migration_id) DO NOTHING;
+        " >/dev/null
+
+        if grep -q -E '^--[[:space:]]*MIGRATION_APPLIED:' "$migration_file"; then
+            applied_tag="applied_$(date '+%Y%m%dT%H%M%S')"
+            sed -i '' -E "s/^--[[:space:]]*MIGRATION_APPLIED:.*/-- MIGRATION_APPLIED: ${applied_tag}/" "$migration_file"
+        fi
+
+        echo "  ✓ 成功"
+        echo ""
+    else
+        while IFS= read -r line; do
+            echo "  $line"
+        done <"$output_file"
+        echo "  ✗ 失败"
+        rm -f "$output_file"
+        exit 1
+    fi
+    rm -f "$output_file"
 done
 
 echo "=== 迁移完成 ==="

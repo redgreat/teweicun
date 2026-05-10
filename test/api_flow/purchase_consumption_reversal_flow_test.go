@@ -164,17 +164,14 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	prefix := testutil.UniquePrefix()
 	admin := testutil.NewClient(env.BaseURL)
 
-	// Step 0: admin login
 	adminLogin, err := admin.Login(ctx, env.AdminUser, env.AdminPass)
 	if err != nil {
 		t.Fatalf("admin login failed: %v", err)
 	}
 	t.Logf("admin login ok: userID=%d username=%s", adminLogin.UserID, adminLogin.Username)
 
-	// Health (optional but helpful)
 	_ = admin.DoJSON(ctx, http.MethodGet, "/api/v1/health", nil, nil, nil)
 
-	// Step 1: create roles A/B/C + users (best-effort on线上环境；若创建失败则退化为 admin 跑全流程)
 	useAdminOnly := false
 	allPermIDs, err := fetchAllPermissionIDs(ctx, admin)
 	if err != nil {
@@ -223,7 +220,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 		}
 	}
 
-	// Step 2: ensure base data (supplier, warehouse, category)
 	supplierCode := mustEnsureSupplier(ctx, t, admin, prefix)
 	warehouseCode := mustEnsureWarehouse(ctx, t, admin, prefix, adminLogin.UserID)
 	categoryID := mustEnsureCategory(ctx, t, admin, prefix)
@@ -231,7 +227,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	codeMatID := mustCreateMaterial(ctx, t, admin, categoryID, prefix+"_CODE_MAT", true)
 	noCodeMatID := mustCreateMaterial(ctx, t, admin, categoryID, prefix+"_NOCODE_MAT", false)
 
-	// Step 3: role A purchase order (10 + 10) and confirm
 	clientA := admin
 	if !useAdminOnly {
 		clientA = testutil.NewClient(env.BaseURL)
@@ -257,7 +252,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	}
 	t.Logf("purchase confirmed: poID=%d orderNo=%s stockInID=%d", poID, po.OrderNo, po.StockInID)
 
-	// Step 4: role C confirm stock-in
 	clientC := admin
 	if !useAdminOnly {
 		clientC = testutil.NewClient(env.BaseURL)
@@ -276,7 +270,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	}
 	t.Logf("stock-in confirmed: stockInNo=%s items=%d", stockIn.StockInNo, len(stockIn.Items))
 
-	// Assert serial codes generated for coded material: pick stock-in item of coded material and check count=10
 	codeStockInItemID := findStockInItemIDByMaterial(stockIn, codeMatID)
 	if codeStockInItemID <= 0 {
 		t.Fatalf("cannot find coded stock-in item for material_id=%d", codeMatID)
@@ -290,7 +283,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	}
 	t.Logf("serial codes generated: count=%d sample=%s", len(serialsIn), serialsIn[0].SerialCode)
 
-	// Step 5: role B create consumption order (5 code + 5 nocode)
 	clientB := admin
 	if !useAdminOnly {
 		clientB = testutil.NewClient(env.BaseURL)
@@ -310,7 +302,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	cons := waitConsumptionOrder(ctx, t, clientB, consID, func(o ConsumptionOrder) bool { return o.StockOutID > 0 })
 	t.Logf("consumption confirmed: orderID=%d stockOutID=%d", consID, cons.StockOutID)
 
-	// Step 6: role C prepare serial selections (auto) and confirm stock-out
 	_ = tryAutoStockOutSerialSelections(ctx, clientC, cons.StockOutID)
 	mustConfirm(ctx, t, clientC, fmt.Sprintf("/api/v1/stock-out/%d/confirm", cons.StockOutID))
 
@@ -320,7 +311,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	}
 	t.Logf("stock-out confirmed: stockOutNo=%s items=%d", stockOut.StockOutNo, len(stockOut.Items))
 
-	// Optional assert: coded stock-out item has 5 selected serials
 	codeStockOutItemID := findStockOutItemIDByMaterial(stockOut, codeMatID)
 	if codeStockOutItemID > 0 {
 		var selectedOutSerials []SerialCodeItem
@@ -331,7 +321,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 		}
 	}
 
-	// Step 7: role B create reversal order (return 3 code + 3 nocode) and confirm
 	codeIssued := mustPickInventoryIssued(ctx, t, clientB, warehouseCode, codeMatID, true, 3)
 	noCodeIssued := mustPickInventoryIssued(ctx, t, clientB, warehouseCode, noCodeMatID, false, 3)
 
@@ -341,25 +330,20 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	rev := waitReversalOrder(ctx, t, clientB, revID, func(o ReversalOrder) bool { return o.StockInID > 0 })
 	t.Logf("reversal confirmed: orderID=%d stockInID=%d", revID, rev.StockInID)
 
-	// Step 8: role C prepare reversal stock-in serial selections (auto via endpoint availability) then confirm reversal stock-in
 	prepareReversalStockInSerials(ctx, t, clientC, rev.StockInID, 3)
 	mustConfirm(ctx, t, clientC, fmt.Sprintf("/api/v1/stock-in/%d/confirm-reversal", rev.StockInID))
 
-	// Step 9: role A create purchase return (5 code + 5 nocode) and confirm
-	// pick inventories from available after reversal in
-	codeInv2 := mustPickInventoryAvailable(ctx, t, clientA, warehouseCode, codeMatID, codeSKUID, true, 5)
-	noCodeInv2 := mustPickInventoryAvailable(ctx, t, clientA, warehouseCode, noCodeMatID, noCodeSKUID, false, 5)
+	codeInv2 := mustPickInventoryAvailable(ctx, t, clientA, warehouseCode, codeMatID, true, 5)
+	noCodeInv2 := mustPickInventoryAvailable(ctx, t, clientA, warehouseCode, noCodeMatID, false, 5)
 	retID := mustCreateReturnOrder(ctx, t, clientA, supplierCode, warehouseCode, codeInv2, 5, noCodeInv2, 5)
 	mustConfirmReturnOrder(ctx, t, clientA, retID, warehouseCode)
 
 	ret := waitReturnOrder(ctx, t, clientA, retID, func(o ReturnOrder) bool { return o.StockOutID != nil && *o.StockOutID > 0 })
 	t.Logf("return confirmed: returnNo=%s stockOutID=%d", ret.ReturnNo, *ret.StockOutID)
 
-	// Step 10: role C confirm stock-out for return
 	_ = tryAutoStockOutSerialSelections(ctx, clientC, *ret.StockOutID)
 	mustConfirm(ctx, t, clientC, fmt.Sprintf("/api/v1/stock-out/%d/confirm", *ret.StockOutID))
 
-	// Step 11: trace material by serial (sample 3)
 	sampleSerials := pickSerialSamples(serialsIn, 3)
 	for _, s := range sampleSerials {
 		q := url.Values{}
@@ -376,11 +360,10 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 		}
 	}
 
-	// Step 12: inventory sku-ledger final quantity should be 3 for both (10-5+3-5)
 	expectFinal := 3.0
 	ledgerRows := mustFetchLedger(ctx, t, clientC)
-	gotCode := findLedgerQty(ledgerRows, codeMatID, codeSKUID)
-	gotNoCode := findLedgerQty(ledgerRows, noCodeMatID, noCodeSKUID)
+	gotCode := findLedgerQty(ledgerRows, codeMatID)
+	gotNoCode := findLedgerQty(ledgerRows, noCodeMatID)
 	if gotCode != expectFinal {
 		t.Fatalf("coded final qty mismatch: got=%v expect=%v", gotCode, expectFinal)
 	}
@@ -388,7 +371,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 		t.Fatalf("nocode final qty mismatch: got=%v expect=%v", gotNoCode, expectFinal)
 	}
 
-	// Step 13: bigscreen dashboard basic sanity
 	var dash map[string]any
 	if err := clientC.DoJSON(ctx, http.MethodGet, "/api/v1/dashboard/bigscreen", nil, nil, &dash); err != nil {
 		t.Fatalf("bigscreen dashboard failed: %v", err)
@@ -670,7 +652,6 @@ func mustEnsureWarehouse(ctx context.Context, t *testing.T, c *testutil.Client, 
 
 func mustEnsureCategory(ctx context.Context, t *testing.T, c *testutil.Client, prefix string) int64 {
 	t.Helper()
-	// category list endpoint returns tree; decode loosely
 	var data []map[string]any
 	_ = c.DoJSON(ctx, http.MethodGet, "/api/v1/base/categories", nil, nil, &data)
 	if len(data) > 0 {
@@ -708,25 +689,7 @@ func mustCreateMaterial(ctx context.Context, t *testing.T, c *testutil.Client, c
 	return out.ID
 }
 
-func mustCreateSKU(ctx context.Context, t *testing.T, c *testutil.Client, materialID int64, skuName string) int64 {
-	t.Helper()
-	req := map[string]any{
-		"material_id":     materialID,
-		"sku_name":        skuName,
-		"reference_price": 10,
-		"custom_attributes": []map[string]any{
-			{"attr_code": "color", "attr_name": "颜色", "attr_type": "text", "attr_value": "red"},
-		},
-		"remark": "e2e",
-	}
-	var out testutil.IDResp
-	if err := c.DoJSON(ctx, http.MethodPost, "/api/v1/base/skus", nil, req, &out); err != nil {
-		t.Fatalf("create sku failed: %v", err)
-	}
-	return out.ID
-}
-
-func mustCreatePurchaseOrder(ctx context.Context, t *testing.T, c *testutil.Client, supplierCode string, codeMatID, codeSKUID, noCodeMatID, noCodeSKUID int64) int64 {
+func mustCreatePurchaseOrder(ctx context.Context, t *testing.T, c *testutil.Client, supplierCode string, codeMatID, noCodeMatID int64) int64 {
 	t.Helper()
 	today := time.Now().Format("2006-01-02")
 	req := map[string]any{
@@ -735,8 +698,8 @@ func mustCreatePurchaseOrder(ctx context.Context, t *testing.T, c *testutil.Clie
 		"order_date":    today,
 		"remark":        "e2e purchase " + today,
 		"items": []map[string]any{
-			{"material_id": codeMatID, "sku_id": codeSKUID, "quantity": 10, "unit_price": 10},
-			{"material_id": noCodeMatID, "sku_id": noCodeSKUID, "quantity": 10, "unit_price": 10},
+			{"material_id": codeMatID, "quantity": 10, "unit_price": 10},
+			{"material_id": noCodeMatID, "quantity": 10, "unit_price": 10},
 		},
 	}
 	var out testutil.IDResp
@@ -749,7 +712,6 @@ func mustCreatePurchaseOrder(ctx context.Context, t *testing.T, c *testutil.Clie
 func mustCreateStockInForPurchase(ctx context.Context, t *testing.T, c *testutil.Client, purchaseOrderID int64, warehouseCode string, poItems []struct {
 	ID         int64   `json:"id"`
 	MaterialID int64   `json:"material_id"`
-	SKUID      *int64  `json:"sku_id"`
 	Quantity   float64 `json:"quantity"`
 }) int64 {
 	t.Helper()
@@ -784,7 +746,6 @@ func mustConfirm(ctx context.Context, t *testing.T, c *testutil.Client, path str
 	t.Helper()
 	if err := c.DoJSON(ctx, http.MethodPost, path, nil, nil, nil); err != nil {
 		if apiErr, ok := err.(*testutil.APIError); ok {
-			// 线上已知：存储过程引用了不存在字段（需部署SQL修复）
 			if strings.Contains(apiErr.Msg, "material_inspection_no") || strings.Contains(apiErr.Body, "material_inspection_no") {
 				t.Fatalf("confirm %s failed (DB stored procedure mismatch: material_inspection_no). Need apply latest migrations / fix sp_confirm_stock_in. raw=%v", path, err)
 			}
@@ -803,8 +764,8 @@ func mustConfirmReturnOrder(ctx context.Context, t *testing.T, c *testutil.Clien
 			t.Logf("return snapshot: id=%d no=%s type=%s status=%s wh=%s supplier=%s stockOutID=%v items=%d",
 				ro.ID, ro.ReturnNo, ro.ReturnType, ro.Status, ro.WarehouseCode, ro.SupplierCode, ro.StockOutID, len(ro.Items))
 			for i, it := range ro.Items {
-				t.Logf("return item[%d]: inventory_id=%d material_id=%d sku_id=%d qty=%.3f",
-					i, it.InventoryID, it.MaterialID, it.SKUID, it.Quantity)
+				t.Logf("return item[%d]: inventory_id=%d material_id=%d qty=%.3f",
+					i, it.InventoryID, it.MaterialID, it.Quantity)
 			}
 		}
 		q := url.Values{}
@@ -818,8 +779,8 @@ func mustConfirmReturnOrder(ctx context.Context, t *testing.T, c *testutil.Clien
 				if i >= 8 {
 					break
 				}
-				t.Logf("avail[%d]: inv=%d material=%d sku=%d isCode=%v avail=%.3f",
-					i, it.InventoryID, it.MaterialID, it.SKUID, it.IsCode, it.AvailableQuantity)
+				t.Logf("avail[%d]: inv=%d material=%d isCode=%v avail=%.3f",
+					i, it.InventoryID, it.MaterialID, it.IsCode, it.AvailableQuantity)
 			}
 		}
 		t.Fatalf("confirm %s failed: %v", path, err)
@@ -857,7 +818,6 @@ func setStockInWarehouseIfEmpty(ctx context.Context, t *testing.T, c *testutil.C
 			"accepted_quantity": it.AcceptedQuantity,
 			"unit_cost":         unitCost,
 			"cert_id":           0,
-			"sku_id":            it.SKUID,
 			"custom_attributes": nil,
 		})
 	}
@@ -871,7 +831,7 @@ func setStockInWarehouseIfEmpty(ctx context.Context, t *testing.T, c *testutil.C
 	}
 }
 
-func mustPickInventoryAvailable(ctx context.Context, t *testing.T, c *testutil.Client, warehouseCode string, materialID, skuID int64, isCode bool, qty float64) InventoryAvailable {
+func mustPickInventoryAvailable(ctx context.Context, t *testing.T, c *testutil.Client, warehouseCode string, materialID int64, isCode bool, qty float64) InventoryAvailable {
 	t.Helper()
 	q := url.Values{}
 	q.Set("page", "1")
@@ -882,11 +842,11 @@ func mustPickInventoryAvailable(ctx context.Context, t *testing.T, c *testutil.C
 		t.Fatalf("list inventory available failed: %v", err)
 	}
 	for _, it := range list {
-		if it.MaterialID == materialID && it.SKUID == skuID && it.IsCode == isCode && it.AvailableQuantity >= qty {
+		if it.MaterialID == materialID && it.IsCode == isCode && it.AvailableQuantity >= qty {
 			return it
 		}
 	}
-	t.Fatalf("cannot find inventory available for material=%d sku=%d qty>=%.2f (got %d rows)", materialID, skuID, qty, len(list))
+	t.Fatalf("cannot find inventory available for material=%d qty>=%.2f (got %d rows)", materialID, qty, len(list))
 	return InventoryAvailable{}
 }
 
@@ -915,7 +875,6 @@ func tryAutoStockOutSerialSelections(ctx context.Context, c *testutil.Client, st
 		"mode":  "auto_fifo",
 		"items": []any{},
 	}
-	// best-effort; some flows may not require it
 	return c.DoJSON(ctx, http.MethodPut, fmt.Sprintf("/api/v1/stock-out/%d/serial-selections", stockOutID), nil, req, nil)
 }
 
@@ -928,7 +887,7 @@ func findStockOutItemIDByMaterial(so StockOutDetail, materialID int64) int64 {
 	return 0
 }
 
-func mustPickInventoryIssued(ctx context.Context, t *testing.T, c *testutil.Client, warehouseCode string, materialID, skuID int64, isCode bool, qty float64) InventoryIssued {
+func mustPickInventoryIssued(ctx context.Context, t *testing.T, c *testutil.Client, warehouseCode string, materialID int64, isCode bool, qty float64) InventoryIssued {
 	t.Helper()
 	q := url.Values{}
 	q.Set("page", "1")
@@ -939,11 +898,11 @@ func mustPickInventoryIssued(ctx context.Context, t *testing.T, c *testutil.Clie
 		t.Fatalf("list inventory issued failed: %v", err)
 	}
 	for _, it := range list {
-		if it.MaterialID == materialID && it.SKUID == skuID && it.IsCode == isCode && it.IssuedQuantity >= qty {
+		if it.MaterialID == materialID && it.IsCode == isCode && it.IssuedQuantity >= qty {
 			return it
 		}
 	}
-	t.Fatalf("cannot find inventory issued for material=%d sku=%d qty>=%.2f (got %d rows)", materialID, skuID, qty, len(list))
+	t.Fatalf("cannot find inventory issued for material=%d qty>=%.2f (got %d rows)", materialID, qty, len(list))
 	return InventoryIssued{}
 }
 
@@ -979,7 +938,6 @@ func prepareReversalStockInSerials(ctx context.Context, t *testing.T, c *testuti
 			t.Fatalf("get available issued serials failed: %v", err)
 		}
 		if len(avail) == 0 {
-			// 非编码物料该接口一般返回空；跳过
 			continue
 		}
 		pick := need
@@ -1008,8 +966,8 @@ func mustCreateReturnOrder(ctx context.Context, t *testing.T, c *testutil.Client
 		"warehouse_code": warehouseCode,
 		"remark":         "e2e purchase return",
 		"items": []map[string]any{
-			{"inventory_id": codeInv.InventoryID, "material_id": codeInv.MaterialID, "sku_id": codeInv.SKUID, "quantity": codeQty},
-			{"inventory_id": noCodeInv.InventoryID, "material_id": noCodeInv.MaterialID, "sku_id": noCodeInv.SKUID, "quantity": noCodeQty},
+			{"inventory_id": codeInv.InventoryID, "material_id": codeInv.MaterialID, "quantity": codeQty},
+			{"inventory_id": noCodeInv.InventoryID, "material_id": noCodeInv.MaterialID, "quantity": noCodeQty},
 		},
 	}
 	var out testutil.IDResp
@@ -1023,7 +981,6 @@ func pickSerialSamples(in []SerialCodeItem, n int) []SerialCodeItem {
 	if len(in) <= n {
 		return in
 	}
-	// pick first, middle, last
 	out := []SerialCodeItem{in[0]}
 	if n >= 2 {
 		out = append(out, in[len(in)/2])
@@ -1034,21 +991,21 @@ func pickSerialSamples(in []SerialCodeItem, n int) []SerialCodeItem {
 	return out[:n]
 }
 
-func mustFetchLedger(ctx context.Context, t *testing.T, c *testutil.Client) []InventorySKULedgerRow {
+func mustFetchLedger(ctx context.Context, t *testing.T, c *testutil.Client) []InventoryMaterialLedgerRow {
 	t.Helper()
 	q := url.Values{}
 	q.Set("page", "1")
 	q.Set("page_size", "100")
-	var list []InventorySKULedgerRow
-	if err := c.DoPage(ctx, http.MethodGet, "/api/v1/inventory/sku-ledger", q, &list, nil); err != nil {
-		t.Fatalf("list sku ledger failed: %v", err)
+	var list []InventoryMaterialLedgerRow
+	if err := c.DoPage(ctx, http.MethodGet, "/api/v1/inventory/material-ledger", q, &list, nil); err != nil {
+		t.Fatalf("list material ledger failed: %v", err)
 	}
 	return list
 }
 
-func findLedgerQty(rows []InventorySKULedgerRow, materialID, skuID int64) float64 {
+func findLedgerQty(rows []InventoryMaterialLedgerRow, materialID int64) float64 {
 	for _, r := range rows {
-		if r.MaterialID == materialID && r.SKUID == skuID {
+		if r.MaterialID == materialID {
 			return r.Quantity
 		}
 	}

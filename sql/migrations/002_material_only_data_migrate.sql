@@ -1,6 +1,11 @@
 -- 功能：物料单模型改造第二步（历史 SKU 拆分为独立物料并回填业务表）
 -- 创建时间：2026-05-07
 -- 创建人：GPT-5.3-Codex
+-- MIGRATION_ID: 002_material_only_data_migrate
+-- MIGRATION_APPLIED: applied_20260510T110424
+
+SELECT CASE WHEN to_regclass('public.material_sku') IS NULL THEN 0 ELSE 1 END AS has_material_sku \gset
+\if :has_material_sku
 
 BEGIN;
 
@@ -155,3 +160,6 @@ LEFT JOIN material_sku ms ON ms.id = mp.old_sku_id
 WHERE i.sku_id = mp.old_sku_id;
 
 COMMIT;
+\else
+SELECT 'SKIP 002: material_sku 表不存在，已跳过历史 SKU 拆分迁移' AS message;
+\endif

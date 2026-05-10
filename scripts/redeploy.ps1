@@ -4,7 +4,7 @@
 .SYNOPSIS
   TeWeiCun (特维存) 本地调试Docker镜像启动脚本
 .DESCRIPTION
-  功能：不触动数据库镜像 -> 构建后端/前端 -> 精准重启业务容器
+  功能：不触动数据库镜像 -> 构建单镜像业务容器 -> 精准重启业务容器
 .EXAMPLE
   .\scripts\redepoly.ps1          # 默认执行完整部署
   .\scripts\redepoly.ps1 down     # 彻底摧毁所有容器
@@ -40,9 +40,9 @@ function Full-Deploy {
   # 1. Build app images once
   Write-Host ""
   Write-Host "================================================" -ForegroundColor Blue
-  Write-Host " 1. Build app images (backend + frontend)" -ForegroundColor Blue
+  Write-Host " 1. Build app image (single image)" -ForegroundColor Blue
   Write-Host "================================================" -ForegroundColor Blue
-  docker-compose -f $COMPOSE_FILE build backend frontend
+  docker-compose -f $COMPOSE_FILE build app
   if ($LASTEXITCODE -ne 0) {
     Write-ErrorMsg 'Image build failed. Exit.'
     exit 1
@@ -54,7 +54,7 @@ function Full-Deploy {
   Write-Host " 2. Stop and remove app containers" -ForegroundColor Blue
   Write-Host "================================================" -ForegroundColor Blue
   # Remove only app containers, keep base services
-  docker-compose -f $COMPOSE_FILE rm -f -s backend frontend
+  docker-compose -f $COMPOSE_FILE rm -f -s twc
 
   # 3. Start containers without rebuild
   Write-Host ""

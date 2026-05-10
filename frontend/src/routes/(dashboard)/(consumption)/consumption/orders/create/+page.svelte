@@ -229,13 +229,14 @@
 	}
 
 	function selectInventory(index: number, inv: any) {
-		const mat = `${inv.material_code || ''} ${inv.material_name || ''}`.trim();
+		const displayName = inv.material_display_name || inv.material_name || '';
+		const mat = `${inv.material_code || ''} ${displayName}`.trim();
 		form.items[index] = {
 			...form.items[index],
 			inventory_id: inv.inventory_id ?? inv.id,
 			material_id: inv.material_id,
 			material_code: inv.material_code || '',
-			material_name: inv.material_name || '',
+			material_name: displayName,
 			is_code: Boolean(inv.is_code),
 			warehouse_id: inv.warehouse_id,
 			warehouse_code: inv.warehouse_code || '',
@@ -587,11 +588,11 @@
 						onclick={() => selectInventory(invDropdownOpenRow as number, inv)}
 					>
 						<div class="text-sm font-medium">
-							{inv.material_name || inv.material_code || '—'}
+							{inv.material_display_name || inv.material_name || inv.material_code || '—'}
 						</div>
 						<div class="text-base-content/70 mt-0.5 text-xs">
 							{inv.material_code}
-							{inv.material_name}
+							{inv.material_display_name || inv.material_name}
 						</div>
 						<div class="text-base-content/50 mt-0.5 flex flex-wrap gap-x-2 text-xs">
 							<span>{inv.warehouse_name}</span>

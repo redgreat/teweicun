@@ -29,6 +29,8 @@ alwaysApply: true
 - 可为 NULL 的列：`SELECT` 中对扫入 `string` 的字段用 `COALESCE(..., '')`，或 DTO 使用指针/Null 类型；详见根目录 `CLAUDE.md`「新增可空列与 Go 查询映射」。
 - 对数据库的改动都总结一个SQL文件放在sql/migrations文件夹里，不要动sql/schema.sql，这个文件是导出表结构备份用的
 - 数据库连接在 configs/config.yaml 里面，每次迭代数据库表结构或者数据时，直接执行就可以了
+- 每个迁移脚本头部必须包含 `-- MIGRATION_ID: <唯一ID>` 与 `-- MIGRATION_APPLIED: pending`，用于发布防重。
+- 数据库迁移统一通过 `scripts/migrate.sh` 执行；执行成功后会写入 `schema_migration_history`，并把脚本头部 `MIGRATION_APPLIED` 更新为已执行标记，后续不再重复执行。
 
 ## 示例
 

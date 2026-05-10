@@ -8,6 +8,7 @@ package handler
 
 import (
 	"encoding/json"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -43,6 +44,10 @@ func CreateCategory(c *gin.Context) {
 
 	id, err := service.CreateCategory(c.Request.Context(), &req)
 	if err != nil {
+		if appErr, ok := err.(*errcode.AppError); ok {
+			response.CustomError(c, appErr.Code, appErr.Msg, http.StatusOK)
+			return
+		}
 		response.Error(c, err)
 		return
 	}
@@ -66,6 +71,10 @@ func UpdateCategory(c *gin.Context) {
 
 	err = service.UpdateCategory(c.Request.Context(), id, &req)
 	if err != nil {
+		if appErr, ok := err.(*errcode.AppError); ok {
+			response.CustomError(c, appErr.Code, appErr.Msg, http.StatusOK)
+			return
+		}
 		response.Error(c, err)
 		return
 	}
@@ -83,6 +92,10 @@ func DeleteCategory(c *gin.Context) {
 
 	err = service.DeleteCategory(c.Request.Context(), id)
 	if err != nil {
+		if appErr, ok := err.(*errcode.AppError); ok {
+			response.CustomError(c, appErr.Code, appErr.Msg, http.StatusOK)
+			return
+		}
 		response.Error(c, err)
 		return
 	}

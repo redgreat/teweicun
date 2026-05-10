@@ -47,8 +47,8 @@
 	}
 
 	function buildSkuOptionLabel(sku: any) {
-		const name = sku?.material_name || sku?.sku_name || '';
-		const code = sku?.material_code || sku?.sku_code || '';
+		const name = sku?.material_display_name || sku?.material_name || '';
+		const code = sku?.material_code || '';
 		if (name && code) return `${name} [${code}]`;
 		return name || code || '';
 	}

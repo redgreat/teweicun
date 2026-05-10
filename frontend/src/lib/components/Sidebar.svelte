@@ -54,7 +54,6 @@
 			icon: Package,
 			children: [
 				{ name: '物料管理', path: '/materials' },
-				{ name: '物料属性', path: '/materials/attributes' },
 				{ name: '物料分类', path: '/materials/categories' },
 				{ name: '供应商管理', path: '/suppliers' },
 				{ name: '客户管理', path: '/customers' },

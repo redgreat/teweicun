@@ -41,8 +41,8 @@
 	}
 
 	function buildInvOptionLabel(inv: any) {
-		const matName = inv?.material_name || inv?.sku_name || '';
-		const matCode = inv?.material_code || inv?.sku_code || '';
+		const matName = inv?.material_display_name || inv?.material_name || '';
+		const matCode = inv?.material_code || '';
 		const wh = inv?.warehouse_name || inv?.warehouse_code || '';
 		const netIssued = formatQty(Number(inv?.issued_quantity ?? 0));
 		const avail = formatQty(Number(inv?.available_quantity ?? 0));
@@ -586,7 +586,7 @@
 						class="hover:bg-base-200/60 border-base-200 w-full border-b px-3 py-2.5 text-left last:border-b-0"
 						onclick={() => selectInv(invDropdownOpenRow as number, invOpt)}
 					>
-						<div class="text-sm font-medium">{invOpt.material_name || invOpt.sku_name || '-'}</div>
+						<div class="text-sm font-medium">{invOpt.material_name || '-'}</div>
 						<div class="text-base-content/60 font-mono text-xs">{buildInvOptionLabel(invOpt)}</div>
 					</button>
 				{/each}

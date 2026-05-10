@@ -68,8 +68,8 @@
 	}
 
 	function buildInvOptionLabel(inv: any) {
-		const matName = inv?.material_name || inv?.sku_name || '';
-		const matCode = inv?.material_code || inv?.sku_code || '';
+		const matName = inv?.material_display_name || inv?.material_name || '';
+		const matCode = inv?.material_code || '';
 		const wh = inv?.warehouse_name || inv?.warehouse_code || '';
 		const available = inv?.available_quantity ?? inv?.available ?? '';
 		const base = matName && matCode ? `${matName} [${matCode}]` : matName || matCode || '';
@@ -248,9 +248,7 @@
 
 	function lineFromDetailItem(it: any) {
 		const invLike = {
-			sku_name: it.sku_name,
 			material_name: it.material_name,
-			sku_code: it.sku_code,
 			material_code: it.material_code,
 			warehouse_name: it.warehouse_name,
 			warehouse_code: it.warehouse_code,
@@ -594,7 +592,7 @@
 						class="hover:bg-base-200/60 border-base-200 w-full border-b px-3 py-2.5 text-left last:border-b-0"
 						onclick={() => selectInv(invDropdownOpenRow as number, invOpt)}
 					>
-						<div class="text-sm font-medium">{invOpt.material_name || invOpt.sku_name || '-'}</div>
+						<div class="text-sm font-medium">{invOpt.material_name || '-'}</div>
 						<div class="text-base-content/60 font-mono text-xs">{buildInvOptionLabel(invOpt)}</div>
 					</button>
 				{/each}

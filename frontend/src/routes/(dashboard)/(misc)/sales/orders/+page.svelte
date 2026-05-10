@@ -48,7 +48,7 @@
 		try {
 			const [cusRes, matRes]: any = await Promise.all([
 				api.get('/base/customers?page=1&page_size=100'),
-				api.get('/base/materials?limit=100')
+				api.get('/base/materials?limit=100&status=enabled')
 			]);
 			customers = cusRes.list || [];
 			materials = matRes.list || [];
@@ -224,7 +224,9 @@
 							<select bind:value={item.material_id} class="select select-sm select-bordered w-full">
 								<option value={0}>选择物料</option>
 								{#each materials as mat}
-									<option value={mat.id}>{mat.material_name} ({mat.material_code})</option>
+									<option value={mat.id}
+										>{mat.material_display_name || mat.material_name} ({mat.material_code})</option
+									>
 								{/each}
 							</select>
 						</div>

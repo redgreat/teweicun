@@ -56,6 +56,20 @@ func CreateMaterial(c *gin.Context) {
 	response.Success(c, gin.H{"id": id})
 }
 
+func GetMaterial(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, "Invalid material ID", errcode.ErrInvalidParam.HTTPCode))
+		return
+	}
+	item, err := service.GetMaterial(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Success(c, item)
+}
+
 func UpdateMaterial(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -71,23 +85,6 @@ func UpdateMaterial(c *gin.Context) {
 
 	userID, _ := middleware.GetUserID(c)
 	err = service.UpdateMaterial(c.Request.Context(), id, &req, userID)
-	if err != nil {
-		response.Error(c, err)
-		return
-	}
-
-	response.Success(c, nil)
-}
-
-func DeleteMaterial(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, "Invalid material ID", errcode.ErrInvalidParam.HTTPCode))
-		return
-	}
-
-	userID, _ := middleware.GetUserID(c)
-	err = service.DeleteMaterial(c.Request.Context(), id, userID)
 	if err != nil {
 		response.Error(c, err)
 		return
