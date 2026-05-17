@@ -178,7 +178,12 @@
 		</a>
 		<div class="flex items-center gap-2">
 			<button type="button" class="btn btn-sm" onclick={goBack} disabled={submitting}>取消</button>
-			<button type="button" class="btn btn-primary btn-sm gap-1" onclick={submit} disabled={submitting || loading}>
+			<button
+				type="button"
+				class="btn btn-primary btn-sm gap-1"
+				onclick={submit}
+				disabled={submitting || loading}
+			>
 				{#if submitting}
 					<span class="loading loading-spinner loading-xs"></span>
 				{/if}
@@ -371,7 +376,12 @@
 
 				<div class="border-base-300 flex flex-wrap items-center justify-end gap-4 border-t pt-6">
 					<button type="button" class="btn" onclick={goBack} disabled={submitting}>取消</button>
-					<button type="button" class="btn btn-primary" onclick={submit} disabled={submitting || loading}>
+					<button
+						type="button"
+						class="btn btn-primary"
+						onclick={submit}
+						disabled={submitting || loading}
+					>
 						{#if submitting}
 							<span class="loading loading-spinner loading-sm"></span>
 						{/if}

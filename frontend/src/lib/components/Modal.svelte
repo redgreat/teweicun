@@ -30,14 +30,17 @@
 </script>
 
 {#if show}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center p-4"
 		in:fade={{ duration: 200 }}
 		out:fade={{ duration: 150 }}
 	>
-		<div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick={close}></div>
+		<button
+			type="button"
+			class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+			aria-label="关闭弹窗"
+			onclick={close}
+		></button>
 
 		<div
 			class="relative w-full {maxWidth} bg-base-100 overflow-hidden rounded-3xl border border-white/10 shadow-2xl {fillBodyHeight

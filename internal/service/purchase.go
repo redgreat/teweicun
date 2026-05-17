@@ -26,8 +26,8 @@ func CreatePurchaseOrder(ctx context.Context, req *request.CreatePurchaseOrderRe
 	return db.CreatePurchaseOrder(ctx, req, userID)
 }
 
-func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurchaseOrderReq) error {
-	return db.UpdatePurchaseOrder(ctx, id, req)
+func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurchaseOrderReq, userID int64) error {
+	return db.UpdatePurchaseOrder(ctx, id, req, userID)
 }
 
 func DeletePurchaseOrder(ctx context.Context, id int64) error {

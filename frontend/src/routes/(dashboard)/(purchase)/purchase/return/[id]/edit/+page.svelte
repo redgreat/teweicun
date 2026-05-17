@@ -1,15 +1,18 @@
 <!--
 功能：编辑采购退货（待提交，内嵌页）
+创建时间：2026-05-16
+创建人：GPT-5.4
 -->
 
 <script lang="ts">
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { ArrowLeft, Plus, Trash2, RotateCcw } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { formatDateInCn, todayDateInCn } from '$lib/datetime';
+	import { buildFloatingDropdownGridLayout, calcFloatingDropdownPlacement } from '$lib/dropdown';
 
 	let suppliers = $state<any[]>([]);
 	let initialLoading = $state(true);
@@ -25,6 +28,7 @@
 	let invDropdownLeft = $state(0);
 	let invDropdownWidth = $state(0);
 	let invDropdownListMaxHeight = $state(260);
+	let invDropdownGridTemplate = $state('300px 192px 192px');
 	let invSearchTerm = $state('');
 	let invSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let invDropdownRAF: number | null = null;
@@ -73,7 +77,7 @@
 		const wh = inv?.warehouse_name || inv?.warehouse_code || '';
 		const available = inv?.available_quantity ?? inv?.available ?? '';
 		const base = matName && matCode ? `${matName} [${matCode}]` : matName || matCode || '';
-		return `${base} | ${matCode} | 仓库:${wh} | 可用:${available}`;
+		return `${base} | 仓库:${wh} | 可用:${available}`;
 	}
 
 	function normalizeInvSearchTerm(text: string) {
@@ -108,6 +112,7 @@
 			invOptionsHasMore = invOptions.length < total && list.length > 0;
 		} catch (err) {
 			console.error(err);
+			toast.error('加载在库物料失败');
 		} finally {
 			invOptionsLoading = false;
 		}
@@ -115,40 +120,38 @@
 
 	function updateInvDropdownPosition() {
 		if (!invDropdownAnchor) return;
-		const rect = invDropdownAnchor.getBoundingClientRect();
-		const headerHeight = 44;
-		const maxListHeight = 320;
-		const spaceBelow = window.innerHeight - rect.bottom;
-		const spaceAbove = rect.top;
-		const openUp = spaceBelow < headerHeight + 160 && spaceAbove > spaceBelow;
-
-		const padding = 8;
-		const width = Math.max(rect.width, 520);
-		let left = rect.left;
-		if (left + width > window.innerWidth - padding) {
-			left = Math.max(padding, window.innerWidth - padding - width);
-		}
-		invDropdownWidth = width;
-		invDropdownLeft = left;
-
-		if (openUp) {
-			const available = Math.max(
-				120,
-				Math.min(maxListHeight, rect.top - padding - 8 - headerHeight)
-			);
-			invDropdownListMaxHeight = available;
-			invDropdownTop = Math.max(padding, rect.top - 8 - headerHeight - available);
-		} else {
-			const available = Math.max(
-				120,
-				Math.min(maxListHeight, window.innerHeight - padding - (rect.bottom + 8) - headerHeight)
-			);
-			invDropdownListMaxHeight = available;
-			invDropdownTop = Math.min(
-				window.innerHeight - padding - headerHeight - available,
-				rect.bottom + 8
-			);
-		}
+		const layout = buildFloatingDropdownGridLayout({
+			firstColumnTexts: invOptions.map((inv) =>
+				String(inv.material_display_name || inv.material_name || inv.material_code || '-')
+			),
+			fixedColumnWidths: [192, 192],
+			minFirstColumnWidth: 300
+		});
+		const placement = calcFloatingDropdownPlacement({
+			anchor: invDropdownAnchor,
+			minWidth: Math.max(760, layout.preferredPanelWidth),
+			maxWidth: 1800,
+			maxListHeight: 320,
+			headerHeight: 44,
+			preferBelowMinSpace: 204,
+			extraWidth: 150,
+			contentTexts: invOptions.map((inv) =>
+				[
+					String(inv.material_display_name || inv.material_name || '-'),
+					String(inv.material_code || '-'),
+					String(inv.warehouse_name || inv.warehouse_code || '-'),
+					`可用 ${inv.available_quantity ?? 0}`,
+					`单价 ¥${formatMoney(inv.unit_cost ?? 0)}`
+				].join('    ')
+			)
+		});
+		const resolvedWidth = Math.max(placement.width, layout.preferredPanelWidth);
+		const viewportWidth = typeof window === 'undefined' ? resolvedWidth : window.innerWidth;
+		invDropdownWidth = resolvedWidth;
+		invDropdownLeft = Math.max(8, Math.min(placement.left, viewportWidth - resolvedWidth - 8));
+		invDropdownTop = placement.top;
+		invDropdownListMaxHeight = placement.listMaxHeight;
+		invDropdownGridTemplate = layout.gridTemplate;
 	}
 
 	function startInvDropdownRAF() {
@@ -173,7 +176,7 @@
 
 	function openInvDropdown(index: number, anchor: HTMLInputElement) {
 		if (!form.supplier_code) {
-			toast.error('缺少供应商信息，无法搜索库存');
+			toast.error('请先确认供应商信息后再搜索在库物料');
 			return;
 		}
 		invDropdownOpenRow = index;
@@ -198,6 +201,7 @@
 		const maxQty = Number(inv.available_quantity ?? 0);
 		form.items[index].inventory_id = Number(inv.inventory_id || 0);
 		form.items[index].material_id = Number(inv.material_id || 0);
+		form.items[index].custom_attributes = inv.custom_attributes || [];
 		form.items[index].unit = String(inv.unit || '').trim() || '件';
 		form.items[index].unit_cost = Number(inv.unit_cost ?? 0);
 		form.items[index].max_quantity = maxQty;
@@ -238,7 +242,8 @@
 			quantity: 1,
 			unit: '',
 			unit_cost: 0,
-			max_quantity: 0
+			max_quantity: 0,
+			custom_attributes: [] as any[]
 		});
 	}
 
@@ -261,12 +266,13 @@
 			quantity: Number(it.quantity || 0),
 			unit: String(it.unit || '').trim() || '件',
 			unit_cost: Number(it.unit_cost ?? 0),
-			max_quantity: Number(it.available_quantity ?? 0)
+			max_quantity: Number(it.available_quantity ?? 0),
+			custom_attributes: it.custom_attributes || []
 		};
 	}
 
 	async function loadReturn() {
-		const id = Number($page.params.id);
+		const id = Number(page.params.id);
 		if (!id) {
 			toast.error('无效的退货单 ID');
 			goto('/purchase/return');
@@ -279,8 +285,8 @@
 				goto(`/purchase/return/${id}`);
 				return;
 			}
-			if (d.status !== 'draft') {
-				toast.error('仅待提交状态可编辑');
+			if (d.status !== 'pending_out') {
+				toast.error('仅待出库状态可编辑');
 				goto(`/purchase/return/${id}`);
 				return;
 			}
@@ -299,7 +305,7 @@
 	}
 
 	async function handleSubmit() {
-		const id = Number($page.params.id);
+		const id = Number(page.params.id);
 		if (!id) {
 			toast.error('无效的退货单');
 			return;
@@ -575,7 +581,7 @@
 		<div
 			class="text-base-content/50 border-base-200 flex items-center justify-between border-b px-3 py-2 text-xs"
 		>
-			<span>匹配 {invOptions.length} / {invOptionsTotal}</span>
+			<span>匹配在库物料 {invOptions.length} / {invOptionsTotal}</span>
 			<button type="button" class="btn btn-xs btn-ghost" onclick={closeInvDropdown}>关闭</button>
 		</div>
 		<div
@@ -583,8 +589,20 @@
 			style="max-height: {invDropdownListMaxHeight}px"
 			onscroll={onInvOptionsScroll}
 		>
+			<div
+				class="bg-base-200/80 border-base-200 sticky top-0 z-10 border-b px-3 py-2 backdrop-blur-sm"
+			>
+				<div
+					class="grid w-full gap-3 text-[11px] font-medium"
+					style:grid-template-columns={invDropdownGridTemplate}
+				>
+					<div>物料</div>
+					<div>仓库</div>
+					<div>库存</div>
+				</div>
+			</div>
 			{#if invOptions.length === 0 && !invOptionsLoading}
-				<div class="text-base-content/50 p-4 text-sm">无可用库存</div>
+				<div class="text-base-content/50 p-4 text-sm">无匹配在库物料</div>
 			{:else}
 				{#each invOptions as invOpt}
 					<button
@@ -592,8 +610,33 @@
 						class="hover:bg-base-200/60 border-base-200 w-full border-b px-3 py-2.5 text-left last:border-b-0"
 						onclick={() => selectInv(invDropdownOpenRow as number, invOpt)}
 					>
-						<div class="text-sm font-medium">{invOpt.material_name || '-'}</div>
-						<div class="text-base-content/60 font-mono text-xs">{buildInvOptionLabel(invOpt)}</div>
+						<div
+							class="grid w-full items-center gap-3"
+							style:grid-template-columns={invDropdownGridTemplate}
+						>
+							<div class="min-w-0">
+								<div class="text-sm font-medium whitespace-nowrap">
+									{invOpt.material_display_name || invOpt.material_name || '-'}
+								</div>
+								<div class="text-base-content/60 font-mono text-[11px] whitespace-nowrap">
+									{invOpt.material_code || '-'}
+								</div>
+							</div>
+							<div>
+								<div class="text-xs whitespace-nowrap">
+									{invOpt.warehouse_name || invOpt.warehouse_code || '-'}
+								</div>
+								<div class="text-base-content/60 text-[11px] whitespace-nowrap">
+									单位 {invOpt.unit || '-'}
+								</div>
+							</div>
+							<div class="text-left md:text-right">
+								<div class="text-xs whitespace-nowrap">可用 {invOpt.available_quantity ?? 0}</div>
+								<div class="text-[11px] whitespace-nowrap text-emerald-500">
+									单价 ¥{formatMoney(invOpt.unit_cost ?? 0)}
+								</div>
+							</div>
+						</div>
 					</button>
 				{/each}
 			{/if}

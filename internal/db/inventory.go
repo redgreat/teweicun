@@ -187,9 +187,6 @@ func ListInventoryAvailable(ctx context.Context, q *request.InventoryAvailableQu
 		SELECT
 			i.id AS inventory_id,
 			i.material_id, m.material_code, m.material_name, m.is_code,
-			0::bigint AS sku_id,
-			''::varchar AS sku_code,
-			''::varchar AS sku_name,
 			i.warehouse_id, w.warehouse_code, w.warehouse_name,
 			COALESCE(m.unit, i.unit) AS unit, COALESCE(i.unit_cost, 0),
 			i.quantity, i.locked_quantity, COALESCE(i.in_transit_quantity, 0) AS in_transit_quantity,
@@ -226,7 +223,6 @@ func ListInventoryAvailable(ctx context.Context, q *request.InventoryAvailableQu
 		if err := rows.Scan(
 			&item.InventoryID,
 			&item.MaterialID, &item.MaterialCode, &item.MaterialName, &item.IsCode,
-			&item.SKUID, &item.SKUCode, &item.SKUName,
 			&item.WarehouseID, &item.WarehouseCode, &item.WarehouseName,
 			&item.Unit, &item.UnitCost,
 			&item.Quantity, &item.LockedQuantity, &item.InTransitQuantity,
@@ -241,7 +237,7 @@ func ListInventoryAvailable(ctx context.Context, q *request.InventoryAvailableQu
 }
 
 // ListInventoryIssued 查询“已出库(可退料)”库存批次（同一列表合并有编码 / 无编码）
-// - 有编码：sku_serial_code.status=issued 且追溯为领料出库完成；issued_quantity=该批次仍 issued 的件数
+// - 有编码：material_serial_code.status=issued 且追溯为领料出库完成；issued_quantity=该批次仍 issued 的件数
 // - 无编码：按 stock_out_item（consumption_order）汇总出库量，减去 reversal_order 已完成退料（净额）
 // 两者均返回 available_quantity（当前批次可用量）；前端上限取 min(issued, available)
 func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) ([]response.InventoryIssuedResp, int64, error) {
@@ -261,7 +257,7 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 		"sc.status = 'issued'",
 		`EXISTS (
 			SELECT 1
-			FROM sku_serial_trace t
+			FROM material_serial_trace t
 			INNER JOIN stock_out so ON so.id = t.ref_doc_id AND so.deleted_at IS NULL
 			WHERE t.serial_code_id = sc.id
 			  AND t.action = 'stock_out'
@@ -278,7 +274,7 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 		SELECT count(*)
 		FROM (
 			SELECT i.id
-			FROM sku_serial_code sc
+			FROM material_serial_code sc
 			INNER JOIN inventory i ON i.id = sc.inventory_id
 			INNER JOIN material m ON m.id = sc.material_id
 			INNER JOIN warehouse w ON w.id = i.warehouse_id AND w.deleted_at IS NULL
@@ -329,14 +325,12 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 			SELECT
 				i.id AS inventory_id,
 				sc.material_id, m.material_code, m.material_name, COALESCE(m.is_code, false),
-				0::bigint AS sku_id,
-				''::varchar AS sku_code, ''::varchar AS sku_name,
 				i.warehouse_id, w.warehouse_code, w.warehouse_name,
 				COALESCE(m.unit, i.unit) AS unit,
 				COALESCE(i.unit_cost, 0) AS unit_cost,
 				COUNT(*)::double precision AS issued_quantity,
 				(i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0))::double precision AS available_quantity
-			FROM sku_serial_code sc
+			FROM material_serial_code sc
 			INNER JOIN inventory i ON i.id = sc.inventory_id
 			INNER JOIN material m ON m.id = sc.material_id
 			INNER JOIN warehouse w ON w.id = i.warehouse_id AND w.deleted_at IS NULL
@@ -350,8 +344,6 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 			SELECT
 				i.id AS inventory_id,
 				i.material_id, m.material_code, m.material_name, COALESCE(m.is_code, false),
-				0::bigint AS sku_id,
-				''::varchar AS sku_code, ''::varchar AS sku_name,
 				i.warehouse_id, w.warehouse_code, w.warehouse_name,
 				COALESCE(m.unit, i.unit) AS unit,
 				COALESCE(i.unit_cost, 0) AS unit_cost,
@@ -399,7 +391,6 @@ func ListInventoryIssued(ctx context.Context, q *request.InventoryIssuedQuery) (
 		if err := rows.Scan(
 			&r.InventoryID,
 			&r.MaterialID, &r.MaterialCode, &r.MaterialName, &r.IsCode,
-			&r.SKUID, &r.SKUCode, &r.SKUName,
 			&r.WarehouseID, &r.WarehouseCode, &r.WarehouseName,
 			&r.Unit, &r.UnitCost,
 			&r.IssuedQuantity,
@@ -418,9 +409,6 @@ func ListInventoryMaterialLedger(ctx context.Context, q *request.InventoryMateri
 	argID := 1
 
 	keyword := strings.TrimSpace(q.MaterialName)
-	if keyword == "" {
-		keyword = strings.TrimSpace(q.SKUName)
-	}
 	if keyword != "" {
 		where = append(where, fmt.Sprintf("(m.material_name ILIKE $%d OR m.material_code ILIKE $%d)", argID, argID))
 		args = append(args, "%"+keyword+"%")
@@ -484,8 +472,6 @@ func ListInventoryMaterialLedger(ctx context.Context, q *request.InventoryMateri
 		SELECT
 			i.material_id,
 			COALESCE(m.material_name, ''),
-			0::bigint AS sku_id,
-			''::varchar AS sku_name,
 			i.warehouse_id,
 			COALESCE(w.warehouse_name, ''),
 			COALESCE(m.is_code, false),
@@ -512,7 +498,7 @@ func ListInventoryMaterialLedger(ctx context.Context, q *request.InventoryMateri
 	for rows.Next() {
 		var item response.InventoryMaterialLedgerResp
 		if err := rows.Scan(
-			&item.MaterialID, &item.MaterialName, &item.SKUID, &item.SKUName, &item.WarehouseID, &item.WarehouseName,
+			&item.MaterialID, &item.MaterialName, &item.WarehouseID, &item.WarehouseName,
 			&item.IsCode, &item.Quantity, &item.UnitCost, &item.TotalAmount, &item.LockedQuantity, &item.InventoryCount, &item.HasCustomAttrs,
 		); err != nil {
 			return nil, 0, nil, err
@@ -535,7 +521,7 @@ func ListInventoryMaterialLedgerSerials(ctx context.Context, q *request.Inventor
 				WHEN 'scrapped' THEN '已报废'
 				ELSE sc.status
 			END AS status_name
-		FROM sku_serial_code sc
+		FROM material_serial_code sc
 		INNER JOIN inventory i ON i.id = sc.inventory_id
 		WHERE i.material_id = $1
 		  AND i.warehouse_id = $2
@@ -565,9 +551,6 @@ func ExportInventoryMaterialLedger(ctx context.Context, q *request.InventoryMate
 	argID := 1
 
 	keyword := strings.TrimSpace(q.MaterialName)
-	if keyword == "" {
-		keyword = strings.TrimSpace(q.SKUName)
-	}
 	if keyword != "" {
 		where = append(where, fmt.Sprintf("(m.material_name ILIKE $%d OR m.material_code ILIKE $%d)", argID, argID))
 		args = append(args, "%"+keyword+"%")
@@ -618,8 +601,6 @@ func ExportInventoryMaterialLedger(ctx context.Context, q *request.InventoryMate
 		SELECT
 			i.material_id,
 			COALESCE(m.material_name, ''),
-			0::bigint AS sku_id,
-			''::varchar AS sku_name,
 			i.warehouse_id,
 			COALESCE(w.warehouse_name, ''),
 			COALESCE(m.is_code, false),
@@ -644,7 +625,7 @@ func ExportInventoryMaterialLedger(ctx context.Context, q *request.InventoryMate
 	for rows.Next() {
 		var item response.InventoryMaterialLedgerResp
 		if err := rows.Scan(
-			&item.MaterialID, &item.MaterialName, &item.SKUID, &item.SKUName, &item.WarehouseID, &item.WarehouseName,
+			&item.MaterialID, &item.MaterialName, &item.WarehouseID, &item.WarehouseName,
 			&item.IsCode, &item.Quantity, &item.UnitCost, &item.TotalAmount, &item.LockedQuantity, &item.InventoryCount, &item.HasCustomAttrs,
 		); err != nil {
 			return nil, nil, err
@@ -653,16 +634,4 @@ func ExportInventoryMaterialLedger(ctx context.Context, q *request.InventoryMate
 	}
 
 	return result, stats, rows.Err()
-}
-
-func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, int64, *response.InventorySKULedgerStatsResp, error) {
-	return ListInventoryMaterialLedger(ctx, q)
-}
-
-func ListInventorySKUSerials(ctx context.Context, q *request.InventorySKUSerialQuery) ([]response.InventorySKUSerialResp, error) {
-	return ListInventoryMaterialLedgerSerials(ctx, q)
-}
-
-func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, *response.InventorySKULedgerStatsResp, error) {
-	return ExportInventoryMaterialLedger(ctx, q)
 }

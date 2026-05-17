@@ -1,8 +1,14 @@
+<!--
+功能：采购退货详情页
+创建时间：2026-05-16
+创建人：GPT-5.4
+-->
+
 <script lang="ts">
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import {
 		ArrowLeft,
 		FileText,
@@ -71,15 +77,14 @@
 	}
 
 	onMount(() => {
-		const id = Number($page.params.id);
+		const id = Number(page.params.id);
 		if (!id) {
-			toast.error('无效的退货单ID');
+			toast.error('无效的退货单 ID');
 			loading = false;
 			return;
 		}
 		loadDetail(id);
 	});
-
 </script>
 
 <div class="space-y-6 text-base">
@@ -104,7 +109,7 @@
 			<a href="/purchase/return" class="btn btn-ghost gap-1 text-base">
 				<ArrowLeft size={18} /> 返回列表
 			</a>
-			{#if order?.status === 'draft'}
+			{#if order?.status === 'pending_out'}
 				<a href={`/purchase/return/${order.id}/edit`} class="btn btn-primary btn-sm text-base"
 					>编辑</a
 				>

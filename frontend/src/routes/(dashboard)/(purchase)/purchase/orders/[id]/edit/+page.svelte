@@ -1,33 +1,37 @@
 <!--
 功能：编辑采购订货（待提交，内嵌页）
+创建时间：2026-05-16
+创建人：GPT-5.4
 -->
 
 <script lang="ts">
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { ArrowLeft, Plus, Trash2, Calendar, Building2 } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { formatDateInCn, todayDateInCn } from '$lib/datetime';
+	import { buildFloatingDropdownGridLayout, calcFloatingDropdownPlacement } from '$lib/dropdown';
 
 	let suppliers = $state<any[]>([]);
 	let initialLoading = $state(true);
 
-	let skuOptions = $state<any[]>([]);
-	let skuOptionsTotal = $state(0);
-	let skuOptionsPage = $state(1);
-	let skuOptionsLoading = $state(false);
-	let skuOptionsHasMore = $state(true);
-	let skuDropdownOpenRow = $state<number | null>(null);
-	let skuDropdownAnchor = $state<HTMLInputElement | null>(null);
-	let skuDropdownTop = $state(0);
-	let skuDropdownLeft = $state(0);
-	let skuDropdownWidth = $state(0);
-	let skuDropdownListMaxHeight = $state(260);
-	let skuSearchTerm = $state('');
-	let skuSearchTimeout: ReturnType<typeof setTimeout> | null = null;
-	let skuDropdownRAF: number | null = null;
+	let materialOptions = $state<any[]>([]);
+	let materialOptionsTotal = $state(0);
+	let materialOptionsPage = $state(1);
+	let materialOptionsLoading = $state(false);
+	let materialOptionsHasMore = $state(true);
+	let materialDropdownOpenRow = $state<number | null>(null);
+	let materialDropdownAnchor = $state<HTMLInputElement | null>(null);
+	let materialDropdownTop = $state(0);
+	let materialDropdownLeft = $state(0);
+	let materialDropdownWidth = $state(0);
+	let materialDropdownListMaxHeight = $state(260);
+	let materialDropdownGridTemplate = $state('260px 192px 96px');
+	let materialSearchTerm = $state('');
+	let materialSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+	let materialDropdownRAF: number | null = null;
 
 	let form = $state({
 		supplier_code: '',
@@ -48,9 +52,9 @@
 		}
 	}
 
-	function buildSkuOptionLabel(sku: any) {
-		const name = sku?.material_display_name || sku?.material_name || '';
-		const code = sku?.material_code || '';
+	function buildMaterialOptionLabel(material: any) {
+		const name = material?.material_display_name || material?.material_name || '';
+		const code = material?.material_code || '';
 		if (name && code) return `${name} [${code}]`;
 		return name || code || '';
 	}
@@ -95,92 +99,95 @@
 		return dt.getTime() < today.getTime();
 	}
 
-	function normalizeSkuSearchTerm(text: string) {
+	function normalizeMaterialSearchTerm(text: string) {
 		return String(text || '')
 			.replace(/\s*\[[^\]]*\]\s*$/, '')
 			.trim();
 	}
 
-	async function loadSkuOptions(params: { reset: boolean }) {
-		if (skuOptionsLoading) return;
-		const nextPage = params.reset ? 1 : skuOptionsPage + 1;
+	async function loadMaterialOptions(params: { reset: boolean }) {
+		if (materialOptionsLoading) return;
+		const nextPage = params.reset ? 1 : materialOptionsPage + 1;
 
-		skuOptionsLoading = true;
+		materialOptionsLoading = true;
 		try {
-			let url = `/base/materials?page=${nextPage}&page_size=50&status=enabled`;
-			const q = skuSearchTerm.trim();
+			const baseUrl = `/base/materials?page=${nextPage}&page_size=50&status=enabled`;
+			const q = materialSearchTerm.trim();
+			let res: any;
 			if (q) {
-				url += `&material_name=${encodeURIComponent(q)}`;
+				const byName: any = await api.get(`${baseUrl}&material_name=${encodeURIComponent(q)}`);
+				const byNameList = byName.list || [];
+				res =
+					nextPage > 1 || byNameList.length > 0
+						? byName
+						: await api.get(`${baseUrl}&material_code=${encodeURIComponent(q)}`);
+			} else {
+				res = await api.get(baseUrl);
 			}
-			const res: any = await api.get(url);
 			const list = res.list || [];
 			const total = Number(res.total || 0);
-			skuOptionsTotal = total;
-			skuOptionsPage = nextPage;
-			skuOptions = params.reset ? list : [...skuOptions, ...list];
-			skuOptionsHasMore = skuOptions.length < total && list.length > 0;
+			materialOptionsTotal = total;
+			materialOptionsPage = nextPage;
+			materialOptions = params.reset ? list : [...materialOptions, ...list];
+			materialOptionsHasMore = materialOptions.length < total && list.length > 0;
 		} catch (err) {
 			console.error(err);
 		} finally {
-			skuOptionsLoading = false;
+			materialOptionsLoading = false;
 		}
 	}
 
-	function updateSkuDropdownPosition() {
-		if (!skuDropdownAnchor) return;
-		const rect = skuDropdownAnchor.getBoundingClientRect();
-		const headerHeight = 44;
-		const maxListHeight = 320;
-		const spaceBelow = window.innerHeight - rect.bottom;
-		const spaceAbove = rect.top;
-		const openUp = spaceBelow < headerHeight + 160 && spaceAbove > spaceBelow;
-
-		const padding = 8;
-		const width = Math.max(rect.width, 360);
-		let left = rect.left;
-		if (left + width > window.innerWidth - padding) {
-			left = Math.max(padding, window.innerWidth - padding - width);
-		}
-		skuDropdownWidth = width;
-		skuDropdownLeft = left;
-
-		if (openUp) {
-			const available = Math.max(
-				120,
-				Math.min(maxListHeight, rect.top - padding - 8 - headerHeight)
-			);
-			skuDropdownListMaxHeight = available;
-			skuDropdownTop = Math.max(padding, rect.top - 8 - headerHeight - available);
-		} else {
-			const available = Math.max(
-				120,
-				Math.min(maxListHeight, window.innerHeight - padding - (rect.bottom + 8) - headerHeight)
-			);
-			skuDropdownListMaxHeight = available;
-			skuDropdownTop = Math.min(
-				window.innerHeight - padding - headerHeight - available,
-				rect.bottom + 8
-			);
-		}
+	function updateMaterialDropdownPosition() {
+		if (!materialDropdownAnchor) return;
+		const layout = buildFloatingDropdownGridLayout({
+			firstColumnTexts: materialOptions.map((material) =>
+				String(material.material_display_name || material.material_name || '-')
+			),
+			fixedColumnWidths: [192, 96],
+			minFirstColumnWidth: 260
+		});
+		const placement = calcFloatingDropdownPlacement({
+			anchor: materialDropdownAnchor,
+			minWidth: Math.max(620, layout.preferredPanelWidth),
+			maxWidth: 1600,
+			maxListHeight: 320,
+			headerHeight: 44,
+			preferBelowMinSpace: 204,
+			extraWidth: 128,
+			contentTexts: materialOptions.map((material) =>
+				[
+					String(material.material_display_name || material.material_name || '-'),
+					String(material.material_code || '-'),
+					String(material.unit_name || material.unit || '-')
+				].join('    ')
+			)
+		});
+		const resolvedWidth = Math.max(placement.width, layout.preferredPanelWidth);
+		const viewportWidth = typeof window === 'undefined' ? resolvedWidth : window.innerWidth;
+		materialDropdownWidth = resolvedWidth;
+		materialDropdownLeft = Math.max(8, Math.min(placement.left, viewportWidth - resolvedWidth - 8));
+		materialDropdownTop = placement.top;
+		materialDropdownListMaxHeight = placement.listMaxHeight;
+		materialDropdownGridTemplate = layout.gridTemplate;
 	}
 
-	function startSkuDropdownRAF() {
-		if (skuDropdownRAF) return;
+	function startMaterialDropdownRAF() {
+		if (materialDropdownRAF) return;
 		const loop = () => {
-			if (skuDropdownOpenRow === null || !skuDropdownAnchor) {
-				skuDropdownRAF = null;
+			if (materialDropdownOpenRow === null || !materialDropdownAnchor) {
+				materialDropdownRAF = null;
 				return;
 			}
-			updateSkuDropdownPosition();
-			skuDropdownRAF = requestAnimationFrame(loop);
+			updateMaterialDropdownPosition();
+			materialDropdownRAF = requestAnimationFrame(loop);
 		};
-		skuDropdownRAF = requestAnimationFrame(loop);
+		materialDropdownRAF = requestAnimationFrame(loop);
 	}
 
-	function stopSkuDropdownRAF() {
-		if (skuDropdownRAF) {
-			cancelAnimationFrame(skuDropdownRAF);
-			skuDropdownRAF = null;
+	function stopMaterialDropdownRAF() {
+		if (materialDropdownRAF) {
+			cancelAnimationFrame(materialDropdownRAF);
+			materialDropdownRAF = null;
 		}
 	}
 
@@ -203,72 +210,72 @@
 		form.items.splice(index, 1);
 	}
 
-	function openSkuDropdown(index: number, anchor: HTMLInputElement) {
-		skuDropdownOpenRow = index;
-		skuDropdownAnchor = anchor;
-		skuSearchTerm = normalizeSkuSearchTerm(form.items[index]?.material_label || '');
-		skuOptions = [];
-		skuOptionsTotal = 0;
-		skuOptionsPage = 1;
-		skuOptionsHasMore = true;
-		loadSkuOptions({ reset: true });
-		updateSkuDropdownPosition();
-		startSkuDropdownRAF();
+	function openMaterialDropdown(index: number, anchor: HTMLInputElement) {
+		materialDropdownOpenRow = index;
+		materialDropdownAnchor = anchor;
+		materialSearchTerm = normalizeMaterialSearchTerm(form.items[index]?.material_label || '');
+		materialOptions = [];
+		materialOptionsTotal = 0;
+		materialOptionsPage = 1;
+		materialOptionsHasMore = true;
+		loadMaterialOptions({ reset: true });
+		updateMaterialDropdownPosition();
+		startMaterialDropdownRAF();
 	}
 
-	function closeSkuDropdown() {
-		skuDropdownOpenRow = null;
-		skuDropdownAnchor = null;
-		stopSkuDropdownRAF();
+	function closeMaterialDropdown() {
+		materialDropdownOpenRow = null;
+		materialDropdownAnchor = null;
+		stopMaterialDropdownRAF();
 	}
 
-	function onSkuInput(index: number) {
+	function onMaterialInput(index: number) {
 		const item = form.items[index];
-		skuDropdownOpenRow = index;
-		skuSearchTerm = normalizeSkuSearchTerm(item?.material_label || '');
+		materialDropdownOpenRow = index;
+		materialSearchTerm = normalizeMaterialSearchTerm(item?.material_label || '');
 		if (item) {
 			item.material_id = 0;
 			item.custom_attributes = [];
 		}
-		if (skuSearchTimeout) clearTimeout(skuSearchTimeout);
-		skuSearchTimeout = setTimeout(() => {
-			skuOptions = [];
-			skuOptionsTotal = 0;
-			skuOptionsPage = 1;
-			skuOptionsHasMore = true;
-			loadSkuOptions({ reset: true });
+		if (materialSearchTimeout) clearTimeout(materialSearchTimeout);
+		materialSearchTimeout = setTimeout(() => {
+			materialOptions = [];
+			materialOptionsTotal = 0;
+			materialOptionsPage = 1;
+			materialOptionsHasMore = true;
+			loadMaterialOptions({ reset: true });
 		}, 250);
 	}
 
-	function selectSku(index: number, sku: any) {
+	function selectMaterial(index: number, material: any) {
 		const item = form.items[index];
 		if (!item) return;
 		if (
 			form.items.some(
-				(it: any, idx: number) => idx !== index && it.material_id && it.material_id === sku.id
+				(it: any, idx: number) => idx !== index && it.material_id && it.material_id === material.id
 			)
 		) {
 			toast.warning('该物料已添加，不能重复');
 			return;
 		}
-		item.material_id = sku.id;
-		item.material_label = buildSkuOptionLabel(sku);
-		item.custom_attributes = sku.custom_attributes || [];
+		item.material_id = material.id;
+		item.material_label = buildMaterialOptionLabel(material);
+		item.custom_attributes = material.custom_attributes || [];
 		if (!item.unit) {
-			item.unit = sku.unit_name || sku.unit || '';
+			item.unit = material.unit_name || material.unit || '';
 		}
 		if (!item.unit_price || Number(item.unit_price) === 0) {
-			item.unit_price = Number(sku.reference_price || 0);
+			item.unit_price = Number(material.reference_price || 0);
 		}
-		closeSkuDropdown();
+		closeMaterialDropdown();
 	}
 
-	function onSkuOptionsScroll(e: Event) {
+	function onMaterialOptionsScroll(e: Event) {
 		const el = e.currentTarget as HTMLElement;
 		if (!el) return;
 		const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
-		if (nearBottom && skuOptionsHasMore && !skuOptionsLoading) {
-			loadSkuOptions({ reset: false });
+		if (nearBottom && materialOptionsHasMore && !materialOptionsLoading) {
+			loadMaterialOptions({ reset: false });
 		}
 	}
 
@@ -279,8 +286,8 @@
 	async function loadOrder(id: number) {
 		try {
 			const detail: any = await api.get(`/purchase/orders/${id}`);
-			if (detail.order_status !== 'draft') {
-				toast.error('仅待提交订单可编辑');
+			if (detail.order_status !== 'ordered') {
+				toast.error('仅待收货订单可编辑');
 				goto('/purchase/orders');
 				return;
 			}
@@ -316,7 +323,7 @@
 	}
 
 	async function handleSubmit() {
-		const id = Number($page.params.id);
+		const id = Number(page.params.id);
 		if (!id) {
 			toast.error('无效的订单');
 			return;
@@ -373,22 +380,22 @@
 	}
 
 	function goBack() {
-		closeSkuDropdown();
+		closeMaterialDropdown();
 		goto('/purchase/orders');
 	}
 
 	function onWindowKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') closeSkuDropdown();
+		if (e.key === 'Escape') closeMaterialDropdown();
 	}
 
 	$effect(() => {
-		if (skuDropdownOpenRow === null) {
-			stopSkuDropdownRAF();
+		if (materialDropdownOpenRow === null) {
+			stopMaterialDropdownRAF();
 		}
 	});
 
 	onMount(async () => {
-		const id = Number($page.params.id);
+		const id = Number(page.params.id);
 		if (!id) {
 			toast.error('无效的订单 ID');
 			goto('/purchase/orders');
@@ -519,9 +526,10 @@
 													type="text"
 													bind:value={item.material_label}
 													class="input input-sm input-bordered bg-base-200/50 w-full min-w-[280px]"
-													placeholder="输入物料名称搜索…"
-													onfocus={(e) => openSkuDropdown(i, e.currentTarget as HTMLInputElement)}
-													oninput={() => onSkuInput(i)}
+													placeholder="输入物料名称或编码搜索…"
+													onfocus={(e) =>
+														openMaterialDropdown(i, e.currentTarget as HTMLInputElement)}
+													oninput={() => onMaterialInput(i)}
 												/>
 											</div>
 										</td>
@@ -589,42 +597,74 @@
 	</div>
 </div>
 
-{#if skuDropdownOpenRow !== null}
-	<div class="fixed inset-0 z-[70]" role="presentation" onclick={closeSkuDropdown}></div>
+{#if materialDropdownOpenRow !== null}
+	<div class="fixed inset-0 z-[70]" role="presentation" onclick={closeMaterialDropdown}></div>
 	<div
 		class="bg-base-100 border-base-300 fixed z-[80] overflow-hidden rounded-xl border shadow-2xl"
-		style="left: {skuDropdownLeft}px; top: {skuDropdownTop}px; width: {skuDropdownWidth}px;"
+		style="left: {materialDropdownLeft}px; top: {materialDropdownTop}px; width: {materialDropdownWidth}px;"
 		role="presentation"
 		onclick={(e) => e.stopPropagation()}
 	>
 		<div
 			class="text-base-content/50 border-base-200 flex items-center justify-between border-b px-3 py-2 text-xs"
 		>
-			<span>匹配 {skuOptions.length} / {skuOptionsTotal}</span>
-			<button type="button" class="btn btn-xs btn-ghost" onclick={closeSkuDropdown}>关闭</button>
+			<span>匹配物料 {materialOptions.length} / {materialOptionsTotal}</span>
+			<button type="button" class="btn btn-xs btn-ghost" onclick={closeMaterialDropdown}
+				>关闭</button
+			>
 		</div>
 		<div
 			class="overflow-auto"
-			style="max-height: {skuDropdownListMaxHeight}px"
-			onscroll={onSkuOptionsScroll}
+			style="max-height: {materialDropdownListMaxHeight}px"
+			onscroll={onMaterialOptionsScroll}
 		>
-			{#if skuOptions.length === 0 && !skuOptionsLoading}
+			<div
+				class="bg-base-200/80 border-base-200 sticky top-0 z-10 border-b px-3 py-2 backdrop-blur-sm"
+			>
+				<div
+					class="grid w-full gap-3 text-[11px] font-medium"
+					style:grid-template-columns={materialDropdownGridTemplate}
+				>
+					<div>物料名称</div>
+					<div>编码</div>
+					<div>单位</div>
+				</div>
+			</div>
+			{#if materialOptions.length === 0 && !materialOptionsLoading}
 				<div class="text-base-content/50 p-4 text-sm">无匹配物料</div>
 			{:else}
-				{#each skuOptions as skuOpt}
+				{#each materialOptions as materialOpt}
 					<button
 						type="button"
 						class="hover:bg-base-200/60 border-base-200 w-full border-b px-3 py-2.5 text-left last:border-b-0"
-						onclick={() => selectSku(skuDropdownOpenRow as number, skuOpt)}
+						onclick={() => selectMaterial(materialDropdownOpenRow as number, materialOpt)}
 					>
-						<div class="text-sm font-medium">{skuOpt.material_name || '-'}</div>
-						<div class="text-base-content/60 font-mono text-xs">{buildSkuOptionLabel(skuOpt)}</div>
+						<div
+							class="grid w-full items-center gap-3"
+							style:grid-template-columns={materialDropdownGridTemplate}
+						>
+							<div class="min-w-0">
+								<div class="text-sm font-medium whitespace-nowrap">
+									{materialOpt.material_display_name || materialOpt.material_name || '-'}
+								</div>
+							</div>
+							<div>
+								<div class="font-mono text-xs whitespace-nowrap">
+									{materialOpt.material_code || '-'}
+								</div>
+							</div>
+							<div>
+								<div class="text-xs whitespace-nowrap">
+									{materialOpt.unit_name || materialOpt.unit || '-'}
+								</div>
+							</div>
+						</div>
 					</button>
 				{/each}
 			{/if}
-			{#if skuOptionsLoading}
+			{#if materialOptionsLoading}
 				<div class="text-base-content/50 p-3 text-xs">加载中...</div>
-			{:else if skuOptionsHasMore}
+			{:else if materialOptionsHasMore}
 				<div class="text-base-content/50 p-3 text-xs">下拉加载更多...</div>
 			{/if}
 		</div>

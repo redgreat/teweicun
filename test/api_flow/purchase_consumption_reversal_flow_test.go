@@ -275,7 +275,7 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 		t.Fatalf("cannot find coded stock-in item for material_id=%d", codeMatID)
 	}
 	var serialsIn []SerialCodeItem
-	if err := clientC.DoJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/sku-serial/stock-in-item/%d", codeStockInItemID), nil, nil, &serialsIn); err != nil {
+	if err := clientC.DoJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/serial-codes/stock-in-item/%d", codeStockInItemID), nil, nil, &serialsIn); err != nil {
 		t.Fatalf("get serial codes by stock-in item failed: %v", err)
 	}
 	if len(serialsIn) != 10 {
@@ -314,7 +314,7 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	codeStockOutItemID := findStockOutItemIDByMaterial(stockOut, codeMatID)
 	if codeStockOutItemID > 0 {
 		var selectedOutSerials []SerialCodeItem
-		if err := clientC.DoJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/sku-serial/stock-out-item/%d", codeStockOutItemID), nil, nil, &selectedOutSerials); err == nil {
+		if err := clientC.DoJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/serial-codes/stock-out-item/%d", codeStockOutItemID), nil, nil, &selectedOutSerials); err == nil {
 			if len(selectedOutSerials) != 5 {
 				t.Fatalf("expected 5 serials selected for coded stock-out item, got %d", len(selectedOutSerials))
 			}
@@ -679,7 +679,6 @@ func mustCreateMaterial(ctx context.Context, t *testing.T, c *testutil.Client, c
 		"material_name": name,
 		"unit":          "pcs",
 		"is_code":       isCode,
-		"sku_managed":   true,
 		"remark":        "e2e",
 	}
 	var out testutil.IDResp
@@ -934,7 +933,7 @@ func prepareReversalStockInSerials(ctx context.Context, t *testing.T, c *testuti
 	}
 	for _, item := range si.Items {
 		var avail []SerialCodeItem
-		if err := c.DoJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/sku-serial/stock-in-item/%d/available-issued", item.ID), nil, nil, &avail); err != nil {
+		if err := c.DoJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/serial-codes/stock-in-item/%d/available-issued", item.ID), nil, nil, &avail); err != nil {
 			t.Fatalf("get available issued serials failed: %v", err)
 		}
 		if len(avail) == 0 {

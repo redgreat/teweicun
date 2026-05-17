@@ -45,9 +45,6 @@ type RelatedStockIn struct {
 type PurchaseOrderItemResp struct {
 	ID               int64               `json:"id"`
 	MaterialID       int64               `json:"material_id"`
-	SKUID            *int64              `json:"sku_id"`
-	SKUCode          *string             `json:"sku_code"`
-	SKUName          *string             `json:"sku_name"`
 	MaterialCode     string              `json:"material_code"`
 	MaterialName     string              `json:"material_name"`
 	Quantity         float64             `json:"quantity"`

@@ -23,7 +23,6 @@ type CreateMaterialReq struct {
 	SafetyStock      float64               `json:"safety_stock"`
 	MaxStock         float64               `json:"max_stock"`
 	IsCode           bool                  `json:"is_code"`
-	SkuManaged       bool                  `json:"sku_managed"`
 	CustomAttributes []CustomAttributeItem `json:"custom_attributes"`
 	Remark           string                `json:"remark"`
 }
@@ -36,7 +35,6 @@ type UpdateMaterialReq struct {
 	SafetyStock      float64               `json:"safety_stock"`
 	MaxStock         float64               `json:"max_stock"`
 	IsCode           bool                  `json:"is_code"`
-	SkuManaged       bool                  `json:"sku_managed"`
 	CustomAttributes []CustomAttributeItem `json:"custom_attributes"`
 	Remark           string                `json:"remark"`
 	Status           string                `json:"status" binding:"oneof=enabled disabled"`

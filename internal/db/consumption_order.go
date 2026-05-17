@@ -395,7 +395,7 @@ func GetConsumptionOrderDetail(ctx context.Context, id int64) (*response.Consump
 	itemQuery := `
 		SELECT 
 			coi.id, coi.order_id, coi.material_id, m.material_code, m.material_name,
-			coi.inventory_id, 0::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
+			coi.inventory_id,
 			coi.quantity, coi.unit, COALESCE(i.unit_cost, 0),
 			COALESCE(coi.remark, '')
 		FROM consumption_order_item coi
@@ -413,7 +413,7 @@ func GetConsumptionOrderDetail(ctx context.Context, id int64) (*response.Consump
 		var item response.ConsumptionOrderItemResp
 		if err := rows.Scan(
 			&item.ID, &item.OrderID, &item.MaterialID, &item.MaterialCode, &item.MaterialName,
-			&item.InventoryID, &item.SKUID, &item.SKUCode, &item.SKUName,
+			&item.InventoryID,
 			&item.Quantity, &item.Unit, &item.UnitCost,
 			&item.Remark,
 		); err != nil {
@@ -444,6 +444,116 @@ func UpdateConsumptionOrderStatus(ctx context.Context, id int64, status string, 
 		return pgx.ErrNoRows
 	}
 	return nil
+}
+
+func UpdateConsumptionOrder(ctx context.Context, id int64, req request.ConsumptionOrderUpdate, userID int64, username string) error {
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var orderStatus string
+	var stockOutID int64
+	err = tx.QueryRow(ctx, `
+		SELECT status, COALESCE(stock_out_id, 0)
+		FROM consumption_order
+		WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE
+	`, id).Scan(&orderStatus, &stockOutID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return fmt.Errorf("领料订单不存在")
+		}
+		return err
+	}
+
+	if orderStatus != "pending" && orderStatus != "confirmed" {
+		return fmt.Errorf("仅待出库状态可编辑")
+	}
+
+	if stockOutID > 0 {
+		if _, err := tx.Exec(ctx, `DELETE FROM stock_out_item WHERE stock_out_id = $1`, stockOutID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM stock_out WHERE id = $1`, stockOutID); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM consumption_order_item WHERE order_id = $1`, id); err != nil {
+		return err
+	}
+
+	wantQty := make(map[int64]float64)
+	invSeen := make(map[int64]struct{})
+	invIDs := make([]int64, 0, len(req.Items))
+	for _, it := range req.Items {
+		if it.InventoryID <= 0 {
+			return fmt.Errorf("明细必须选择有效库存批次")
+		}
+		wantQty[it.InventoryID] += it.Quantity
+		if _, ok := invSeen[it.InventoryID]; !ok {
+			invSeen[it.InventoryID] = struct{}{}
+			invIDs = append(invIDs, it.InventoryID)
+		}
+	}
+
+	invRows, err := loadConsumptionInventoryRows(ctx, tx, invIDs)
+	if err != nil {
+		return err
+	}
+
+	for i, it := range req.Items {
+		row, ok := invRows[it.InventoryID]
+		if !ok {
+			return fmt.Errorf("第%d行：库存批次无效", i+1)
+		}
+		if row.MaterialID != it.MaterialID {
+			return fmt.Errorf("第%d行：物料与所选库存批次不一致", i+1)
+		}
+	}
+
+	for invID, need := range wantQty {
+		row := invRows[invID]
+		avail := row.Quantity - row.LockedQuantity - row.InTransit
+		if need > avail+1e-9 {
+			return fmt.Errorf("库存批次 ID %d 可用量不足（可用 %.3f），本次需求 %.3f",
+				row.ID, row.Quantity-row.LockedQuantity-row.InTransit, need)
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE consumption_order
+		SET project_no = $1, product_name = $2, order_date = $3::date,
+		    designer_id = $4, designer_name = $5, remark = $6, stock_out_id = NULL,
+		    updated_by = $7, updated_at = NOW()
+		WHERE id = $8
+	`, req.ProjectNo, req.ProductName, req.OrderDate, req.DesignerID, req.DesignerName, req.Remark, userID, id); err != nil {
+		return err
+	}
+
+	for _, item := range req.Items {
+		row := invRows[item.InventoryID]
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO consumption_order_item (
+				order_id, material_id, inventory_id, quantity,
+				unit, remark, warehouse_id, warehouse_code
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, id, item.MaterialID, item.InventoryID, item.Quantity,
+			item.Unit, item.Remark, row.WarehouseID, row.WarehouseCode); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	auditQuery := `CALL sp_write_audit_log($1, $2, $3, $4, $5, $6, $7)`
+	database.Pool.Exec(ctx, auditQuery, userID, username, "UPDATE", "CONSUMPTION_ORDER", "consumption_order", id, nil)
+
+	return ConfirmConsumptionOrder(ctx, id, userID)
 }
 
 func ConfirmConsumptionOrder(ctx context.Context, id int64, userID int64) error {

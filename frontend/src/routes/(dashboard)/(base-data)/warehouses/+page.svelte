@@ -201,9 +201,12 @@
 	<div class="space-y-4">
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"><span class="label-text font-bold">仓库编码</span></label>
+				<label class="label" for="warehouse-code"
+					><span class="label-text font-bold">仓库编码</span></label
+				>
 				{#if editingId}
 					<input
+						id="warehouse-code"
 						type="text"
 						bind:value={form.warehouse_code}
 						class="input input-bordered bg-base-200/50 w-full"
@@ -211,6 +214,7 @@
 					/>
 				{:else}
 					<input
+						id="warehouse-code"
 						type="text"
 						value="系统自动生成"
 						class="input input-bordered bg-base-200/50 w-full"
@@ -219,8 +223,11 @@
 				{/if}
 			</div>
 			<div class="form-control">
-				<label class="label"><span class="label-text font-bold">仓库名称</span></label>
+				<label class="label" for="warehouse-name"
+					><span class="label-text font-bold">仓库名称</span></label
+				>
 				<input
+					id="warehouse-name"
 					type="text"
 					bind:value={form.warehouse_name}
 					class="input input-bordered w-full"
@@ -232,8 +239,15 @@
 
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"><span class="label-text font-bold">仓库类型</span></label>
-				<select bind:value={form.warehouse_type} class="select select-bordered w-full" required>
+				<label class="label" for="warehouse-type"
+					><span class="label-text font-bold">仓库类型</span></label
+				>
+				<select
+					id="warehouse-type"
+					bind:value={form.warehouse_type}
+					class="select select-bordered w-full"
+					required
+				>
 					<option value="" disabled selected>选择类型</option>
 					{#each warehouseTypeOptions as opt}
 						<option value={opt.value}>{opt.label}</option>
@@ -241,8 +255,15 @@
 				</select>
 			</div>
 			<div class="form-control">
-				<label class="label"><span class="label-text font-bold">负责人</span></label>
-				<select bind:value={form.manager_id} class="select select-bordered w-full" required>
+				<label class="label" for="warehouse-manager"
+					><span class="label-text font-bold">负责人</span></label
+				>
+				<select
+					id="warehouse-manager"
+					bind:value={form.manager_id}
+					class="select select-bordered w-full"
+					required
+				>
 					<option value={0} disabled selected>选择负责人</option>
 					{#each managerOptions as opt}
 						<option value={opt.value}>{opt.label}</option>
@@ -253,8 +274,14 @@
 
 		{#if editingId}
 			<div class="form-control">
-				<label class="label"><span class="label-text font-bold">状态</span></label>
-				<select bind:value={form.status} class="select select-bordered w-full">
+				<label class="label" for="warehouse-status"
+					><span class="label-text font-bold">状态</span></label
+				>
+				<select
+					id="warehouse-status"
+					bind:value={form.status}
+					class="select select-bordered w-full"
+				>
 					<option value="enabled">可用</option>
 					<option value="disabled">禁用</option>
 				</select>

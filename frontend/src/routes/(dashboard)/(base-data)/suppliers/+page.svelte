@@ -53,7 +53,7 @@
 			const res: any = await api.get(`/base/suppliers?page=${page}&page_size=${pageSize}`);
 			suppliers = res.list || [];
 			total = res.total || 0;
-		} catch (_err) {
+		} catch (err) {
 			console.error(err);
 		} finally {
 			loading = false;
@@ -282,8 +282,12 @@
 
 		{#if editingId}
 			<div class="form-control">
-				<label class="label"><span class="label-text">状态</span></label>
-				<select bind:value={form.status} class="select select-bordered bg-base-200/50 w-full">
+				<label class="label" for="supplier-status"><span class="label-text">状态</span></label>
+				<select
+					id="supplier-status"
+					bind:value={form.status}
+					class="select select-bordered bg-base-200/50 w-full"
+				>
 					<option value="enabled">可用</option>
 					<option value="disabled">禁用</option>
 				</select>

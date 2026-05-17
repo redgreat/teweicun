@@ -7,7 +7,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -n "${BASH_VERSION:-}" ]; then
+    SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+else
+    SCRIPT_SOURCE="$0"
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "=== TeWeiCun 数据库迁移脚本 ==="
@@ -70,7 +76,7 @@ if [ ${#MIGRATION_FILES[@]} -eq 0 ]; then
 fi
 
 AUTO_YES=0
-if [ "$1" = "-y" ] || [ "$1" = "--yes" ]; then
+if [ "${1:-}" = "-y" ] || [ "${1:-}" = "--yes" ]; then
     AUTO_YES=1
 fi
 

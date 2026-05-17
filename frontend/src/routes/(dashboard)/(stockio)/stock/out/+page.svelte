@@ -67,6 +67,7 @@
 			return `/purchase/return/${row.business_doc_id}`;
 		if (row.business_doc_type === 'consumption_order')
 			return `/consumption/orders/${row.business_doc_id}`;
+		if (row.business_doc_type === 'sales_order') return `/sales/orders/${row.business_doc_id}`;
 		return '';
 	}
 

@@ -93,5 +93,32 @@ export function getStatusStyle(status: string, module: string): StatusStyle {
 		return map[s] || { class: 'badge-ghost', label: status || '-' };
 	}
 
+	// 7. 销售订单 (Sales Order)
+	if (module === 'sales_order') {
+		const map: Record<string, StatusStyle> = {
+			draft: {
+				class: 'badge-ghost bg-base-200 text-base-content/70 border-base-300',
+				label: '待提交'
+			},
+			confirmed: { class: 'badge-info badge-outline', label: '待出库' },
+			preparing: { class: 'badge-warning badge-outline', label: '出库中' },
+			shipped: { class: 'badge-success text-white', label: '已完成' },
+			cancelled: { class: 'badge-error badge-outline', label: '已取消' }
+		};
+		return map[s] || { class: 'badge-ghost', label: status || '-' };
+	}
+
+	// 8. 销售退货 (Sales Return)
+	if (module === 'sales_return') {
+		const map: Record<string, StatusStyle> = {
+			draft: {
+				class: 'badge-ghost bg-base-200 text-base-content/70 border-base-300',
+				label: '待提交'
+			},
+			confirmed: { class: 'badge-success text-white', label: '已完成' }
+		};
+		return map[s] || { class: 'badge-ghost', label: status || '-' };
+	}
+
 	return { class: 'badge-ghost', label: status || '-' };
 }

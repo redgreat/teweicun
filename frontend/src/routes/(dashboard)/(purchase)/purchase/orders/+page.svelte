@@ -1,5 +1,7 @@
 <!--
-功能：采购订单列表页面
+功能：采购订货列表页面
+创建时间：2026-05-16
+创建人：GPT-5.4
 -->
 
 <script lang="ts">
@@ -8,12 +10,11 @@
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
-	import { Edit3, Trash2, CheckCircle, FileText } from 'lucide-svelte';
+	import { SquarePen, Trash2, FileText } from 'lucide-svelte';
 	import {
 		dgRowBtn,
 		dgRowBtnDanger,
 		dgRowBtnPrimary,
-		dgRowBtnSuccess,
 		dgToolbarBtn
 	} from '$lib/dgButtonClasses';
 	import { goto } from '$app/navigation';
@@ -35,7 +36,13 @@
 		end_date: ''
 	});
 
-	let suppliers = $state<any[]>([]);
+	let supplierOptions = $state<any[]>([]);
+	let supplierOptionsPage = $state(1);
+	let supplierOptionsHasMore = $state(true);
+	let supplierOptionsLoading = $state(false);
+	let supplierDropdownOpen = $state(false);
+	let supplierSearchValue = $state('');
+	let supplierSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	const columns = [
 		{ key: 'order_no', label: '系统单号', class: 'font-mono text-primary', width: '14%' },
@@ -86,16 +93,88 @@
 			start_date: '',
 			end_date: ''
 		};
+		supplierSearchValue = '';
 		loadData(1);
 	}
 
-	async function loadSuppliers() {
+	function normalizeSearchTerm(value: string) {
+		return String(value || '').trim();
+	}
+
+	async function loadSupplierOptions(reset = false) {
+		if (supplierOptionsLoading) return;
+		const nextPage = reset ? 1 : supplierOptionsPage + 1;
+		supplierOptionsLoading = true;
 		try {
-			const res: any = await api.get('/base/suppliers?page=1&page_size=100');
-			suppliers = res.list || [];
+			let url = `/base/suppliers?page=${nextPage}&page_size=20`;
+			const q = normalizeSearchTerm(supplierSearchValue);
+			if (q) {
+				const byName: any = await api.get(`${url}&supplier_name=${encodeURIComponent(q)}`);
+				const list = byName.list || [];
+				const res =
+					nextPage > 1 || list.length > 0
+						? byName
+						: await api.get(`${url}&supplier_code=${encodeURIComponent(q)}`);
+				const nextList = res.list || [];
+				const totalCount = Number(res.total || 0);
+				supplierOptionsPage = nextPage;
+				supplierOptions = reset ? nextList : [...supplierOptions, ...nextList];
+				supplierOptionsHasMore = supplierOptions.length < totalCount && nextList.length > 0;
+				return;
+			}
+			const res: any = await api.get(url);
+			const list = res.list || [];
+			const totalCount = Number(res.total || 0);
+			supplierOptionsPage = nextPage;
+			supplierOptions = reset ? list : [...supplierOptions, ...list];
+			supplierOptionsHasMore = supplierOptions.length < totalCount && list.length > 0;
 		} catch (err) {
 			console.error(err);
+		} finally {
+			supplierOptionsLoading = false;
 		}
+	}
+
+	function openSupplierDropdown() {
+		supplierDropdownOpen = true;
+		supplierOptions = [];
+		supplierOptionsPage = 1;
+		supplierOptionsHasMore = true;
+		loadSupplierOptions(true);
+	}
+
+	function closeSupplierDropdown() {
+		supplierDropdownOpen = false;
+	}
+
+	function onSupplierInput() {
+		filters.supplier_code = '';
+		if (supplierSearchTimeout) clearTimeout(supplierSearchTimeout);
+		supplierSearchTimeout = setTimeout(() => {
+			supplierOptions = [];
+			supplierOptionsPage = 1;
+			supplierOptionsHasMore = true;
+			loadSupplierOptions(true);
+		}, 250);
+	}
+
+	function selectSupplier(supplier: any) {
+		filters.supplier_code = supplier.supplier_code || '';
+		supplierSearchValue = supplier.supplier_name || supplier.supplier_code || '';
+		closeSupplierDropdown();
+	}
+
+	function onSupplierOptionsScroll(e: Event) {
+		const el = e.currentTarget as HTMLElement;
+		if (!el) return;
+		const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 12;
+		if (nearBottom && supplierOptionsHasMore && !supplierOptionsLoading) {
+			loadSupplierOptions(false);
+		}
+	}
+
+	function onWindowKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') closeSupplierDropdown();
 	}
 
 	function navigateToCreate() {
@@ -123,16 +202,6 @@
 		}
 	}
 
-	async function handleConfirm(order: any) {
-		try {
-			await api.post(`/purchase/orders/${order.id}/confirm`);
-			toast.success('订单确认成功');
-			loadData(currentPage);
-		} catch (err: any) {
-			toast.error('确认失败: ' + (err?.message || err));
-		}
-	}
-
 	function formatAmount(amount: number) {
 		return '¥' + (amount || 0).toFixed(2);
 	}
@@ -144,9 +213,10 @@
 
 	onMount(() => {
 		loadData(1);
-		loadSuppliers();
 	});
 </script>
+
+<svelte:window onkeydown={onWindowKeydown} />
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<DataGrid
@@ -174,15 +244,55 @@
 					bind:value={filters.order_no}
 					onkeydown={(e) => e.key === 'Enter' && handleSearch()}
 				/>
-				<select
-					class="select bg-base-200 focus:bg-base-100 h-10 min-h-10 w-[9.5rem] shrink-0 rounded-lg border-none py-0 pr-8 pl-2 text-base leading-tight"
-					bind:value={filters.supplier_code}
+				<div
+					class="relative z-20 w-[10.5rem] min-w-0 shrink-0"
+					onclick={(e) => e.stopPropagation()}
+					role="presentation"
 				>
-					<option value="">供应商</option>
-					{#each suppliers as s}
-						<option value={s.supplier_code}>{s.supplier_name}</option>
-					{/each}
-				</select>
+					<input
+						type="text"
+						class="input bg-base-200 focus:bg-base-100 h-10 min-h-10 w-full rounded-lg border-none px-3 text-base"
+						placeholder="供应商名称/编码"
+						bind:value={supplierSearchValue}
+						onfocus={openSupplierDropdown}
+						oninput={onSupplierInput}
+						onkeydown={(e) => e.key === 'Enter' && handleSearch()}
+					/>
+					{#if supplierDropdownOpen}
+						<div
+							class="fixed inset-0 z-[60]"
+							role="presentation"
+							onclick={closeSupplierDropdown}
+						></div>
+						<div
+							class="bg-base-100 border-base-300 absolute top-full right-0 left-0 z-[70] mt-2 overflow-hidden rounded-xl border shadow-2xl"
+						>
+							<div class="max-h-72 overflow-auto" onscroll={onSupplierOptionsScroll}>
+								{#if supplierOptions.length === 0 && !supplierOptionsLoading}
+									<div class="text-base-content/50 p-4 text-center text-sm">未找到匹配供应商</div>
+								{:else}
+									{#each supplierOptions as supplier}
+										<button
+											type="button"
+											class="hover:bg-base-200/60 border-base-200 w-full border-b px-3 py-2.5 text-left last:border-b-0"
+											onclick={() => selectSupplier(supplier)}
+										>
+											<div class="text-sm font-medium">{supplier.supplier_name || '-'}</div>
+											<div class="text-base-content/60 font-mono text-xs">
+												{supplier.supplier_code || '-'}
+											</div>
+										</button>
+									{/each}
+								{/if}
+								{#if supplierOptionsLoading}
+									<div class="text-base-content/50 p-3 text-center text-xs">加载中...</div>
+								{:else if supplierOptionsHasMore}
+									<div class="text-base-content/50 p-3 text-center text-xs">下拉加载更多...</div>
+								{/if}
+							</div>
+						</div>
+					{/if}
+				</div>
 				<select
 					class="select bg-base-200 focus:bg-base-100 h-10 min-h-10 w-[7rem] shrink-0 rounded-lg border-none py-0 pr-7 pl-2 text-base leading-tight"
 					bind:value={filters.order_status}
@@ -248,12 +358,9 @@
 				<a class={dgRowBtn} href={`/purchase/orders/${order.id}`}>
 					<FileText size={16} /> 详情
 				</a>
-				{#if order.order_status === 'draft'}
+				{#if order.order_status === 'ordered'}
 					<button type="button" class={dgRowBtnPrimary} onclick={() => navigateToEdit(order)}>
-						<Edit3 size={16} /> 编辑
-					</button>
-					<button type="button" class={dgRowBtnSuccess} onclick={() => handleConfirm(order)}>
-						<CheckCircle size={16} /> 确认
+						<SquarePen size={16} /> 编辑
 					</button>
 					<button type="button" class={dgRowBtnDanger} onclick={() => handleDelete(order)}>
 						<Trash2 size={16} /> 删除
@@ -266,7 +373,7 @@
 
 <ConfirmDialog
 	bind:show={showConfirm}
-	title="删除采购订单"
-	message={`确定要删除采购订单「${deleteTarget?.order_no || ''}」吗？删除后无法恢复。`}
+	title="删除采购订货"
+	message={`确定要删除采购订货「${deleteTarget?.order_no || ''}」吗？删除后无法恢复。`}
 	onConfirm={confirmDelete}
 />

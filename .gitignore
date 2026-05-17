@@ -39,3 +39,4 @@ config/config.yaml
 .codeartsdoer/
 .trae/
 .cursor/
+logs/*

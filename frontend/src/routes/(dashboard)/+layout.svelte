@@ -224,11 +224,12 @@
 >
 	<div class="space-y-4">
 		<div class="form-control">
-			<label class="label"
+			<label class="label" for="profile-old-password"
 				><span class="label-text flex items-center gap-2"><KeyRound size={14} /> 当前密码</span
 				></label
 			>
 			<input
+				id="profile-old-password"
 				type="password"
 				bind:value={passwordForm.old_password}
 				class="input input-bordered bg-base-200/50 w-full"
@@ -237,8 +238,9 @@
 		</div>
 		<div class="divider divider-sm text-base-content/20 my-0">新密码</div>
 		<div class="form-control">
-			<label class="label"><span class="label-text">新密码</span></label>
+			<label class="label" for="profile-new-password"><span class="label-text">新密码</span></label>
 			<input
+				id="profile-new-password"
 				type="password"
 				bind:value={passwordForm.new_password}
 				class="input input-bordered bg-base-200/50 w-full"
@@ -246,8 +248,11 @@
 			/>
 		</div>
 		<div class="form-control">
-			<label class="label"><span class="label-text">确认新密码</span></label>
+			<label class="label" for="profile-confirm-password"
+				><span class="label-text">确认新密码</span></label
+			>
 			<input
+				id="profile-confirm-password"
 				type="password"
 				bind:value={passwordForm.confirm_password}
 				class="input input-bordered bg-base-200/50 w-full"
@@ -279,11 +284,12 @@
 		</div>
 
 		<div class="form-control">
-			<label class="label"
+			<label class="label" for="profile-real-name"
 				><span class="label-text flex items-center gap-2"><UserCircle size={14} /> 真实姓名</span
 				></label
 			>
 			<input
+				id="profile-real-name"
 				type="text"
 				bind:value={profileForm.real_name}
 				class="input input-bordered bg-base-200/50 w-full"
@@ -293,8 +299,9 @@
 
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"><span class="label-text">手机号</span></label>
+				<label class="label" for="profile-phone"><span class="label-text">手机号</span></label>
 				<input
+					id="profile-phone"
 					type="text"
 					bind:value={profileForm.phone}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -302,8 +309,9 @@
 				/>
 			</div>
 			<div class="form-control">
-				<label class="label"><span class="label-text">邮箱</span></label>
+				<label class="label" for="profile-email"><span class="label-text">邮箱</span></label>
 				<input
+					id="profile-email"
 					type="email"
 					bind:value={profileForm.email}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -313,8 +321,9 @@
 		</div>
 
 		<div class="form-control">
-			<label class="label"><span class="label-text">部门</span></label>
+			<label class="label" for="profile-department"><span class="label-text">部门</span></label>
 			<input
+				id="profile-department"
 				type="text"
 				bind:value={profileForm.department}
 				class="input input-bordered bg-base-200/50 w-full"

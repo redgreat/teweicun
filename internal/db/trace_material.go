@@ -52,7 +52,7 @@ func QueryTraceBySerial(ctx context.Context, serialCode string) (*SerialCodeInfo
 		       sc.material_name, sc.status,
 		       COALESCE(w.warehouse_name, ''),
 		       sc.created_at
-		FROM sku_serial_code sc
+		FROM material_serial_code sc
 		LEFT JOIN warehouse w ON w.id = sc.warehouse_id
 		WHERE sc.serial_code ILIKE '%' || $1 || '%'
 		ORDER BY
@@ -91,8 +91,8 @@ func QueryTraceBySerial(ctx context.Context, serialCode string) (*SerialCodeInfo
 		       st.created_at,
 		       COALESCE(fw.warehouse_name, ''), COALESCE(tw.warehouse_name, ''),
 		       COALESCE(st.remark, '')
-		FROM sku_serial_trace st
-		JOIN sku_serial_code sc ON sc.id = st.serial_code_id
+		FROM material_serial_trace st
+		JOIN material_serial_code sc ON sc.id = st.serial_code_id
 		LEFT JOIN warehouse fw ON fw.id = st.from_warehouse_id
 		LEFT JOIN warehouse tw ON tw.id = st.to_warehouse_id
 		WHERE st.serial_code_id = $1

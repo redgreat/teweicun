@@ -42,7 +42,6 @@ type UpdateStockInItem struct {
 	AcceptedQuantity float64 `json:"accepted_quantity" binding:"required,gt=0"`
 	UnitCost         float64 `json:"unit_cost"`
 	CertID           int64   `json:"cert_id"`
-	SKUID            int64   `json:"sku_id"`
 	CustomAttributes any     `json:"custom_attributes"`
 }
 

@@ -121,8 +121,8 @@ func ListMaterials(ctx context.Context, q *request.MaterialQuery) ([]response.Ma
 	query := fmt.Sprintf(`
 		SELECT id, category_id, category_name, material_code, material_name,
 		       unit, unit_name, safety_stock, max_stock,
-		       is_code, sku_managed, custom_attributes, default_warehouse_id, default_warehouse_name,
-		       status, status_name, remark, created_at, updated_at, sku_count
+		       is_code, custom_attributes, default_warehouse_id, default_warehouse_name,
+		       status, status_name, remark, created_at, updated_at
 		FROM v_material_list
 		WHERE %s
 		ORDER BY id DESC
@@ -143,8 +143,8 @@ func ListMaterials(ctx context.Context, q *request.MaterialQuery) ([]response.Ma
 		var customAttrsJSON []byte
 		if err := rows.Scan(&item.ID, &item.CategoryID, &item.CategoryName, &item.MaterialCode, &item.MaterialName,
 			&item.Unit, &item.UnitName, &item.SafetyStock, &item.MaxStock,
-			&item.IsCode, &item.SkuManaged, &customAttrsJSON, &item.DefaultWarehouseID, &item.DefaultWarehouseName,
-			&item.Status, &item.StatusName, &item.Remark, &item.CreatedAt, &item.UpdatedAt, &item.SkuCount); err != nil {
+			&item.IsCode, &customAttrsJSON, &item.DefaultWarehouseID, &item.DefaultWarehouseName,
+			&item.Status, &item.StatusName, &item.Remark, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
 
@@ -164,8 +164,8 @@ func GetMaterial(ctx context.Context, id int64) (*response.MaterialResp, error) 
 	query := `
 		SELECT id, category_id, category_name, material_code, material_name,
 		       unit, unit_name, safety_stock, max_stock,
-		       is_code, sku_managed, custom_attributes, default_warehouse_id, default_warehouse_name,
-		       status, status_name, remark, created_at, updated_at, sku_count
+		       is_code, custom_attributes, default_warehouse_id, default_warehouse_name,
+		       status, status_name, remark, created_at, updated_at
 		FROM v_material_list
 		WHERE id = $1
 		LIMIT 1
@@ -175,8 +175,8 @@ func GetMaterial(ctx context.Context, id int64) (*response.MaterialResp, error) 
 	err := database.Pool.QueryRow(ctx, query, id).Scan(
 		&item.ID, &item.CategoryID, &item.CategoryName, &item.MaterialCode, &item.MaterialName,
 		&item.Unit, &item.UnitName, &item.SafetyStock, &item.MaxStock,
-		&item.IsCode, &item.SkuManaged, &customAttrsJSON, &item.DefaultWarehouseID, &item.DefaultWarehouseName,
-		&item.Status, &item.StatusName, &item.Remark, &item.CreatedAt, &item.UpdatedAt, &item.SkuCount,
+		&item.IsCode, &customAttrsJSON, &item.DefaultWarehouseID, &item.DefaultWarehouseName,
+		&item.Status, &item.StatusName, &item.Remark, &item.CreatedAt, &item.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err

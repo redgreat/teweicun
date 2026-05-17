@@ -97,7 +97,10 @@
 			await api.post('/base/materials', {
 				...form,
 				custom_attributes: form.custom_attributes
-					.map((a) => ({ attr_name: a.attr_name.trim(), attr_value: String(a.attr_value || '').trim() }))
+					.map((a) => ({
+						attr_name: a.attr_name.trim(),
+						attr_value: String(a.attr_value || '').trim()
+					}))
 					.filter((a) => a.attr_name || a.attr_value)
 			});
 			toast.success('新增成功');
@@ -141,7 +144,12 @@
 		</a>
 		<div class="flex items-center gap-2">
 			<button type="button" class="btn btn-sm" onclick={goBack} disabled={submitting}>取消</button>
-			<button type="button" class="btn btn-primary btn-sm gap-1" onclick={submit} disabled={submitting}>
+			<button
+				type="button"
+				class="btn btn-primary btn-sm gap-1"
+				onclick={submit}
+				disabled={submitting}
+			>
 				{#if submitting}
 					<span class="loading loading-spinner loading-xs"></span>
 				{/if}
@@ -160,7 +168,7 @@
 					<div class="relative">
 						<select
 							id="mat-category-id"
-							class="select select-bordered bg-base-200/50 h-11 w-full text-base text-transparent [&_option]:text-base-content"
+							class="select select-bordered bg-base-200/50 [&_option]:text-base-content h-11 w-full text-base text-transparent"
 							bind:value={form.category_id}
 						>
 							<option value={0}>请选择分类</option>
@@ -168,7 +176,9 @@
 								<option value={c.id}>{c.display_name}</option>
 							{/each}
 						</select>
-						<span class="text-base-content pointer-events-none absolute inset-y-0 left-4 right-10 flex items-center truncate text-sm">
+						<span
+							class="text-base-content pointer-events-none absolute inset-y-0 right-10 left-4 flex items-center truncate text-sm"
+						>
 							{#if Number(form.category_id) === 0}
 								<span class="text-base-content/50">请选择分类</span>
 							{:else}

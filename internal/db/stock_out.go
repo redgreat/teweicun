@@ -91,7 +91,9 @@ func ListStockOuts(ctx context.Context, q *request.StockOutQuery) ([]response.St
 		       COALESCE(so.ref_doc_type, ''), so.ref_doc_id,
 		       COALESCE(so.ref_doc_type, '') AS business_doc_type,
 		       COALESCE(so.ref_doc_id, 0) AS business_doc_id,
-		       COALESCE(ro.return_no, co.order_no, '') AS business_doc_no,
+		       COALESCE(ro.return_no, co.order_no, so_ref.order_no, '') AS business_doc_no,
+		       COALESCE(so.customer_code, ''),
+		       COALESCE(so.customer_name, ''),
 		       COALESCE(so.receiver, ''), so.status, COALESCE(so.remark, ''), so.created_at, so.confirmed_at,
 		       COALESCE((
 		           SELECT SUM(soi2.quantity * COALESCE(inv2.unit_cost, 0))
@@ -111,6 +113,7 @@ func ListStockOuts(ctx context.Context, q *request.StockOutQuery) ([]response.St
 		) wh ON true
 		LEFT JOIN return_order ro ON ro.id = so.ref_doc_id AND so.ref_doc_type = 'purchase_return' AND ro.deleted_at IS NULL
 		LEFT JOIN consumption_order co ON co.id = so.ref_doc_id AND so.ref_doc_type = 'consumption_order' AND co.deleted_at IS NULL
+		LEFT JOIN sales_order so_ref ON so_ref.id = so.ref_doc_id AND so.ref_doc_type = 'sales_order' AND so_ref.deleted_at IS NULL
 		WHERE %s
 		ORDER BY so.id DESC
 		LIMIT $%d OFFSET $%d
@@ -130,7 +133,7 @@ func ListStockOuts(ctx context.Context, q *request.StockOutQuery) ([]response.St
 		if err := rows.Scan(&item.ID, &item.StockOutNo, &item.StockOutDate, &item.OutType, &item.WarehouseCode,
 			&item.WarehouseName, &item.RefDocType, &item.RefDocID,
 			&item.BusinessDocType, &item.BusinessDocID, &item.BusinessDocNo,
-			&item.Receiver, &item.Status,
+			&item.CustomerCode, &item.CustomerName, &item.Receiver, &item.Status,
 			&item.Remark, &item.CreatedAt, &item.ConfirmedAt, &item.TotalAmount); err != nil {
 			return nil, 0, err
 		}
@@ -149,7 +152,9 @@ func GetStockOutDetail(ctx context.Context, id int64) (*response.StockOutResp, e
 		       COALESCE(so.ref_doc_type, ''), so.ref_doc_id,
 		       COALESCE(so.ref_doc_type, '') AS business_doc_type,
 		       COALESCE(so.ref_doc_id, 0) AS business_doc_id,
-		       COALESCE(ro.return_no, co.order_no, '') AS business_doc_no,
+		       COALESCE(ro.return_no, co.order_no, so_ref.order_no, '') AS business_doc_no,
+		       COALESCE(so.customer_code, ''),
+		       COALESCE(so.customer_name, ''),
 		       COALESCE(so.receiver, ''), so.status, COALESCE(so.remark, ''), so.created_at, so.confirmed_at,
 		       COALESCE((
 		           SELECT SUM(soi2.quantity * COALESCE(inv2.unit_cost, 0))
@@ -169,13 +174,14 @@ func GetStockOutDetail(ctx context.Context, id int64) (*response.StockOutResp, e
 		) wh ON true
 		LEFT JOIN return_order ro ON ro.id = so.ref_doc_id AND so.ref_doc_type = 'purchase_return' AND ro.deleted_at IS NULL
 		LEFT JOIN consumption_order co ON co.id = so.ref_doc_id AND so.ref_doc_type = 'consumption_order' AND co.deleted_at IS NULL
+		LEFT JOIN sales_order so_ref ON so_ref.id = so.ref_doc_id AND so.ref_doc_type = 'sales_order' AND so_ref.deleted_at IS NULL
 		WHERE so.id = $1 AND so.deleted_at IS NULL
 	`
 	var item response.StockOutResp
 	err := database.Pool.QueryRow(ctx, query, id).Scan(&item.ID, &item.StockOutNo, &item.StockOutDate, &item.OutType, &item.WarehouseCode,
 		&item.WarehouseName, &item.RefDocType, &item.RefDocID,
 		&item.BusinessDocType, &item.BusinessDocID, &item.BusinessDocNo,
-		&item.Receiver, &item.Status,
+		&item.CustomerCode, &item.CustomerName, &item.Receiver, &item.Status,
 		&item.Remark, &item.CreatedAt, &item.ConfirmedAt, &item.TotalAmount)
 	if err != nil {
 		return nil, err
@@ -183,7 +189,6 @@ func GetStockOutDetail(ctx context.Context, id int64) (*response.StockOutResp, e
 
 	itemQuery := `
 		SELECT soi.id, soi.material_id, m.material_code, m.material_name,
-		       0::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
 		       soi.inventory_id, soi.quantity,
 		       soi.unit, COALESCE(i.unit_cost, 0),
 		       m.is_code
@@ -201,7 +206,6 @@ func GetStockOutDetail(ctx context.Context, id int64) (*response.StockOutResp, e
 	for rows.Next() {
 		var sub response.StockOutItemResp
 		if err := rows.Scan(&sub.ID, &sub.MaterialID, &sub.MaterialCode, &sub.MaterialName,
-			&sub.SKUID, &sub.SKUCode, &sub.SKUName,
 			&sub.InventoryID, &sub.Quantity, &sub.Unit, &sub.UnitCost, &sub.IsCode); err != nil {
 			return nil, err
 		}
@@ -275,6 +279,10 @@ func ConfirmStockOut(ctx context.Context, stockOutID int64, userID int64, userna
 		if err := confirmPurchaseReturnStockOut(ctx, stockOutID, userID); err != nil {
 			return err
 		}
+	} else if outType == "sales" {
+		if err := confirmSalesStockOut(ctx, stockOutID, userID); err != nil {
+			return err
+		}
 	} else if outType == "consumption" {
 		// 领料出库现在也支持手动备货，直接调用存储过程即可，
 		// 因为 sp_confirm_stock_out 已被我们重构为支持从暂存表读取编码。
@@ -300,6 +308,84 @@ func ConfirmStockOut(ctx context.Context, stockOutID int64, userID int64, userna
 	_, _ = database.Pool.Exec(ctx, auditQuery, userID, username, "CONFIRM", "STOCK_OUT", "stock_out", stockOutID, nil)
 
 	return nil
+}
+
+func confirmSalesStockOut(ctx context.Context, stockOutID, userID int64) error {
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	var refDocID *int64
+	err = tx.QueryRow(ctx, `
+		SELECT status, ref_doc_id
+		FROM stock_out
+		WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE
+	`, stockOutID).Scan(&status, &refDocID)
+	if err != nil {
+		return err
+	}
+	if status == "confirmed" {
+		return fmt.Errorf("出库单已完成，无需重复确认")
+	}
+	if refDocID == nil || *refDocID == 0 {
+		return fmt.Errorf("销售出库单缺少关联销售订单")
+	}
+
+	if _, err := tx.Exec(ctx, `CALL sp_confirm_stock_out($1, $2)`, stockOutID, userID); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			return fmt.Errorf("DB_ERROR: %s", pgErr.Message)
+		}
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE sales_order_item soi
+		SET shipped_quantity = LEAST(soi.quantity, soi.shipped_quantity + src.qty),
+		    updated_at = NOW()
+		FROM (
+			SELECT material_id, SUM(quantity) AS qty
+			FROM stock_out_item
+			WHERE stock_out_id = $1
+			GROUP BY material_id
+		) src
+		WHERE soi.order_id = $2
+		  AND soi.material_id = src.material_id
+	`, stockOutID, *refDocID); err != nil {
+		return err
+	}
+
+	var allShipped bool
+	if err := tx.QueryRow(ctx, `
+		SELECT NOT EXISTS (
+			SELECT 1
+			FROM sales_order_item
+			WHERE order_id = $1
+			  AND shipped_quantity < quantity
+		)
+	`, *refDocID).Scan(&allShipped); err != nil {
+		return err
+	}
+
+	nextStatus := "preparing"
+	if allShipped {
+		nextStatus = "shipped"
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE sales_order
+		SET order_status = $2,
+		    updated_by = $3,
+		    updated_at = NOW()
+		WHERE id = $1
+	`, *refDocID, nextStatus, userID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func confirmPurchaseReturnStockOut(ctx context.Context, stockOutID, userID int64) error {
@@ -429,7 +515,7 @@ func confirmPurchaseReturnStockOut(ctx context.Context, stockOutID, userID int64
 			}
 
 			tag, err := tx.Exec(ctx, `
-				UPDATE sku_serial_code
+				UPDATE material_serial_code
 				SET status = 'issued', updated_at = NOW()
 				WHERE id = ANY($1)
 				  AND inventory_id = $2
@@ -443,12 +529,12 @@ func confirmPurchaseReturnStockOut(ctx context.Context, stockOutID, userID int64
 			}
 
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO sku_serial_trace (
+				INSERT INTO material_serial_trace (
 					serial_code_id, serial_code, action, ref_doc_type, ref_doc_no, ref_doc_id,
 					from_warehouse_id, operator_id, remark
 				)
 				SELECT id, serial_code, 'stock_out', 'stock_out', $1, $2, warehouse_id, $3, '出库确认-编码已领用'
-				FROM sku_serial_code
+				FROM material_serial_code
 				WHERE id = ANY($4)
 			`, stockOutNo, stockOutID, userID, selectedIDs); err != nil {
 				return err
@@ -559,7 +645,7 @@ func UpdateStockOutSerialSelections(ctx context.Context, stockOutID, userID int6
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO stock_out_item_serial_selection (stock_out_item_id, serial_code_id, created_by)
 				SELECT $1, sc.id, $2
-				FROM sku_serial_code sc
+				FROM material_serial_code sc
 				WHERE sc.inventory_id = $3
 				  AND sc.status = 'in_stock'
 				  AND NOT EXISTS (
@@ -595,7 +681,7 @@ func UpdateStockOutSerialSelections(ctx context.Context, stockOutID, userID int6
 		var validCount int
 		validRows, err := tx.Query(ctx, `
 			SELECT id
-			FROM sku_serial_code
+			FROM material_serial_code
 			WHERE id = ANY($1)
 			  AND inventory_id = $2
 			  AND status = 'in_stock'

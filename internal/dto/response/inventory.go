@@ -40,9 +40,6 @@ type InventoryAvailableResp struct {
 	MaterialCode      string   `json:"material_code"`
 	MaterialName      string   `json:"material_name"`
 	IsCode            bool     `json:"is_code"`
-	SKUID             int64    `json:"sku_id"`
-	SKUCode           string   `json:"sku_code"`
-	SKUName           string   `json:"sku_name"`
 	WarehouseID       int64    `json:"warehouse_id"`
 	WarehouseCode     string   `json:"warehouse_code"`
 	WarehouseName     string   `json:"warehouse_name"`
@@ -63,9 +60,6 @@ type InventoryIssuedResp struct {
 	MaterialCode      string  `json:"material_code"`
 	MaterialName      string  `json:"material_name"`
 	IsCode            bool    `json:"is_code"`
-	SKUID             int64   `json:"sku_id"`
-	SKUCode           string  `json:"sku_code"`
-	SKUName           string  `json:"sku_name"`
 	WarehouseID       int64   `json:"warehouse_id"`
 	WarehouseCode     string  `json:"warehouse_code"`
 	WarehouseName     string  `json:"warehouse_name"`
@@ -78,8 +72,6 @@ type InventoryIssuedResp struct {
 type InventoryMaterialLedgerResp struct {
 	MaterialID       int64   `json:"material_id"`
 	MaterialName     string  `json:"material_name"`
-	SKUID            int64   `json:"sku_id"`
-	SKUName          string  `json:"sku_name"`
 	WarehouseID      int64   `json:"warehouse_id"`
 	WarehouseName    string  `json:"warehouse_name"`
 	IsCode           bool    `json:"is_code"`
@@ -103,7 +95,3 @@ type InventoryMaterialLedgerSerialResp struct {
 	Status     string `json:"status"`
 	StatusName string `json:"status_name"`
 }
-
-type InventorySKULedgerResp = InventoryMaterialLedgerResp
-type InventorySKULedgerStatsResp = InventoryMaterialLedgerStatsResp
-type InventorySKUSerialResp = InventoryMaterialLedgerSerialResp

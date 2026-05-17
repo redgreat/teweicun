@@ -1,9 +1,15 @@
+<!--
+功能：采购订货详情页
+创建时间：2026-05-16
+创建人：GPT-5.4
+-->
+
 <script lang="ts">
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { ArrowLeft, FileText, Building2, Calendar, BadgeCheck, Coins } from 'lucide-svelte';
+	import { page } from '$app/state';
+	import { ArrowLeft, FileText, Building2, Calendar, BadgeCheck, Coins, PackageOpen, Pencil } from 'lucide-svelte';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
 	let loading = $state(true);
@@ -38,7 +44,7 @@
 			const detail: any = await api.get(`/purchase/orders/${id}`);
 			order = detail;
 		} catch (err: any) {
-			toast.error('加载采购订单详情失败: ' + (err?.message || err));
+			toast.error('加载采购订货详情失败: ' + (err?.message || err));
 			order = null;
 		} finally {
 			loading = false;
@@ -46,29 +52,28 @@
 	}
 
 	onMount(() => {
-		const id = Number($page.params.id);
+		const id = Number(page.params.id);
 		if (!id) {
-			toast.error('无效的订单ID');
+			toast.error('无效的订货单 ID');
 			loading = false;
 			return;
 		}
 		loadDetail(id);
 	});
-
 </script>
 
 <div class="space-y-6">
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-3">
 			<div class="h-8 w-1.5 rounded-full bg-blue-500"></div>
-			<h1 class="text-2xl font-bold tracking-tight">采购订单详情</h1>
+			<h1 class="text-2xl font-bold tracking-tight">采购订货详情</h1>
 		</div>
 
 		<div class="breadcrumbs text-base opacity-60">
 			<ul>
 				<li>首页</li>
 				<li>采购管理</li>
-				<li><a class="text-primary" href="/purchase/orders">采购订单</a></li>
+				<li><a class="text-primary" href="/purchase/orders">采购订货</a></li>
 				<li>详情</li>
 			</ul>
 		</div>
@@ -79,8 +84,10 @@
 			<a href="/purchase/orders" class="btn btn-ghost btn-sm gap-1">
 				<ArrowLeft size={14} /> 返回列表
 			</a>
-			{#if order?.order_status === 'draft'}
-				<a href={`/purchase/orders/${order.id}/edit`} class="btn btn-primary btn-sm">编辑</a>
+			{#if order?.order_status === 'ordered'}
+				<a href={`/purchase/orders/${order.id}/edit`} class="btn btn-primary btn-sm gap-1">
+					<Pencil size={14} /> 编辑
+				</a>
 			{/if}
 		</div>
 		{#if order}
@@ -167,16 +174,14 @@
 
 				<div class="bg-base-200/40 border-base-300 rounded-xl border p-4">
 					<div class="text-base-content/50 text-base">关联入库单号</div>
-					<div class="mt-1 flex flex-wrap gap-2">
-						{#if order.stock_in_records?.length > 0}
-							{#each order.stock_in_records as si}
-								<a
-									href={`/stock/in/${si.id}`}
-									class="link link-primary font-mono text-base no-underline hover:underline"
-								>
-									{si.order_no}
-								</a>
-							{/each}
+					<div class="mt-1">
+						{#if order.stock_in_id && order.stock_in_no}
+							<a
+								href={`/stock/in/${order.stock_in_id}`}
+								class="link link-primary font-mono text-base no-underline hover:underline"
+							>
+								<PackageOpen size={14} class="inline mr-1" />{order.stock_in_no}
+							</a>
 						{:else}
 							<span class="text-base">-</span>
 						{/if}

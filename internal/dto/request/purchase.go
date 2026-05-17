@@ -10,10 +10,10 @@ type PurchaseOrderQuery struct {
 	PageQuery
 	OrderNo      string `form:"order_no"`
 	SupplierCode string `form:"supplier_code"`
-	OrderStatus   string `form:"order_status"`
-	OrderType     string `form:"order_type"`
-	StartDate     string `form:"start_date"`
-	EndDate       string `form:"end_date"`
+	OrderStatus  string `form:"order_status"`
+	OrderType    string `form:"order_type"`
+	StartDate    string `form:"start_date"`
+	EndDate      string `form:"end_date"`
 }
 
 type CreatePurchaseOrderReq struct {
@@ -27,7 +27,6 @@ type CreatePurchaseOrderReq struct {
 
 type CreatePurchaseOrderItemReq struct {
 	MaterialID int64   `json:"material_id" binding:"required"`
-	SKUID      int64   `json:"sku_id"`
 	Quantity   float64 `json:"quantity" binding:"required,gt=0"`
 	UnitPrice  float64 `json:"unit_price"`
 }
@@ -41,7 +40,6 @@ type UpdatePurchaseOrderReq struct {
 type UpdatePurchaseOrderItemReq struct {
 	ID         int64   `json:"id" binding:"required"`
 	MaterialID int64   `json:"material_id" binding:"required"`
-	SKUID      int64   `json:"sku_id"`
 	Quantity   float64 `json:"quantity" binding:"required,gt=0"`
 	UnitPrice  float64 `json:"unit_price"`
 }

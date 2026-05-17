@@ -30,6 +30,10 @@ func UpdateReturnOrder(ctx context.Context, id int64, req *request.UpdateReturnO
 	return db.UpdateReturnOrder(ctx, id, req, userID, username)
 }
 
+func UpdateSalesReturnOrder(ctx context.Context, id int64, req *request.UpdateSalesReturnOrderReq, userID int64, username string) error {
+	return db.UpdateSalesReturnOrder(ctx, id, req, userID, username)
+}
+
 func ConfirmReturnOrder(ctx context.Context, id int64, userID int64, username string) error {
 	return db.ConfirmReturnOrder(ctx, id, userID, username)
 }

@@ -285,7 +285,6 @@ func GetReversalOrderDetail(ctx context.Context, id int64) (*response.ReversalOr
 	itemQuery := `
 		SELECT 
 			roi.id, roi.order_id, roi.material_id, m.material_code, m.material_name,
-			0::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
 			roi.quantity, roi.unit, COALESCE(inv.unit_cost, 0),
 			COALESCE(roi.remark, ''), COALESCE(w.warehouse_name, '')
 		FROM reversal_order_item roi
@@ -304,7 +303,6 @@ func GetReversalOrderDetail(ctx context.Context, id int64) (*response.ReversalOr
 		var item response.ReversalOrderItemResp
 		if err := rows.Scan(
 			&item.ID, &item.OrderID, &item.MaterialID, &item.MaterialCode, &item.MaterialName,
-			&item.SKUID, &item.SKUCode, &item.SKUName,
 			&item.Quantity, &item.Unit, &item.UnitCost,
 			&item.Remark, &item.WarehouseName,
 		); err != nil {
@@ -335,6 +333,141 @@ func UpdateReversalOrderStatus(ctx context.Context, id int64, status string, use
 		return pgx.ErrNoRows
 	}
 	return nil
+}
+
+func UpdateReversalOrder(ctx context.Context, id int64, req request.ReversalOrderUpdate, userID int64, username string) error {
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var orderStatus string
+	var stockInID int64
+	err = tx.QueryRow(ctx, `
+		SELECT status, COALESCE(stock_in_id, 0)
+		FROM reversal_order
+		WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE
+	`, id).Scan(&orderStatus, &stockInID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return fmt.Errorf("退料订单不存在")
+		}
+		return err
+	}
+
+	if orderStatus != "pending" && orderStatus != "confirmed" {
+		return fmt.Errorf("仅待入库状态可编辑")
+	}
+
+	if stockInID > 0 {
+		if _, err := tx.Exec(ctx, `DELETE FROM stock_in_item WHERE stock_in_id = $1`, stockInID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM stock_in WHERE id = $1`, stockInID); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM reversal_order_item WHERE order_id = $1`, id); err != nil {
+		return err
+	}
+
+	lines := make([]reversalResolvedLine, 0, len(req.Items))
+	var headerWhID int64
+	var headerWhCode string
+
+	for i, item := range req.Items {
+		if item.InventoryID <= 0 {
+			return fmt.Errorf("第%d行须选择在库 SKU/库存批次", i+1)
+		}
+
+		var whID int64
+		var whCode string
+		var matID int64
+		var unit string
+		var avail float64
+		err = tx.QueryRow(ctx, `
+			SELECT i.warehouse_id, w.warehouse_code, i.material_id,
+			       COALESCE(NULLIF(TRIM(i.unit), ''), m.unit),
+			       (i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0))
+			FROM inventory i
+			INNER JOIN warehouse w ON w.id = i.warehouse_id AND w.deleted_at IS NULL
+			INNER JOIN material m ON m.id = i.material_id
+			WHERE i.id = $1
+		`, item.InventoryID).Scan(&whID, &whCode, &matID, &unit, &avail)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				return fmt.Errorf("第%d行：库存批次不存在", i+1)
+			}
+			return err
+		}
+
+		if item.MaterialID > 0 && item.MaterialID != matID {
+			return fmt.Errorf("第%d行：物料与所选库存不一致", i+1)
+		}
+
+		if i == 0 {
+			headerWhID, headerWhCode = whID, whCode
+		} else if whID != headerWhID {
+			return fmt.Errorf("退料明细涉及多个仓库，请拆单后再提交")
+		}
+
+		if item.Quantity > avail+1e-9 {
+			return fmt.Errorf("第%d行：退料数量超过可用库存（可用 %.3f）", i+1, avail)
+		}
+
+		u := strings.TrimSpace(item.Unit)
+		if u == "" {
+			u = strings.TrimSpace(unit)
+		}
+		if u == "" {
+			u = "件"
+		}
+
+		lines = append(lines, reversalResolvedLine{
+			MaterialID:  matID,
+			Unit:        u,
+			Quantity:    item.Quantity,
+			InventoryID: item.InventoryID,
+			Remark:      item.Remark,
+		})
+	}
+
+	if headerWhID == 0 {
+		return fmt.Errorf("无法解析退料仓库")
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE reversal_order
+		SET project_no = $1, product_name = $2, warehouse_id = $3, warehouse_code = $4,
+		    order_date = $5::date, designer_id = $6, designer_name = $7, remark = $8,
+		    stock_in_id = NULL, updated_by = $9, updated_at = NOW()
+		WHERE id = $10
+	`, req.ProjectNo, req.ProductName, headerWhID, headerWhCode,
+		req.OrderDate, req.DesignerID, req.DesignerName, req.Remark, userID, id); err != nil {
+		return err
+	}
+
+	for _, ln := range lines {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO reversal_order_item (
+				order_id, material_id, quantity, unit, remark, inventory_id
+			) VALUES ($1, $2, $3, $4, $5, $6)
+		`, id, ln.MaterialID, ln.Quantity, ln.Unit, ln.Remark, ln.InventoryID); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	auditQuery := `CALL sp_write_audit_log($1, $2, $3, $4, $5, $6, $7)`
+	database.Pool.Exec(ctx, auditQuery, userID, username, "UPDATE", "REVERSAL_ORDER", "reversal_order", id, nil)
+
+	return ConfirmReversalOrder(ctx, id, userID)
 }
 
 func ConfirmReversalOrder(ctx context.Context, id int64, userID int64) error {

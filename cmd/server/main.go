@@ -217,6 +217,15 @@ func main() {
 			protected.DELETE("/purchase/orders/:id", handler.DeletePurchaseOrder)
 			protected.POST("/purchase/orders/:id/confirm", handler.ConfirmPurchaseOrder)
 
+			// Fund Routes
+			protected.GET("/fund/payments", handler.ListFundPayments)
+			protected.GET("/fund/payments/:id", handler.GetFundPayment)
+			protected.POST("/fund/payments", handler.CreateFundPayment)
+
+			protected.GET("/fund/collections", handler.ListFundCollections)
+			protected.GET("/fund/collections/:id", handler.GetFundCollection)
+			protected.POST("/fund/collections", handler.CreateFundCollection)
+
 			// Stock In Routes
 			protected.GET("/stock-in", handler.ListStockIns)
 			protected.GET("/stock-in/:id", handler.GetStockIn)
@@ -284,6 +293,7 @@ func main() {
 			protected.GET("/sales/orders", handler.ListSalesOrders)
 			protected.GET("/sales/orders/:id", handler.GetSalesOrderDetail)
 			protected.POST("/sales/orders", handler.CreateSalesOrder)
+			protected.PUT("/sales/orders/:id", handler.UpdateSalesOrder)
 			protected.POST("/sales/orders/:id/confirm", handler.ConfirmSalesOrder)
 			protected.POST("/sales/orders/:id/cancel", handler.CancelSalesOrder)
 			protected.POST("/sales/orders/:id/ship", handler.ShipSalesOrder)
@@ -293,6 +303,7 @@ func main() {
 			protected.GET("/returns/:id", handler.GetReturnOrderDetail)
 			protected.POST("/returns", handler.CreateReturnOrder)
 			protected.PUT("/returns/:id", handler.UpdateReturnOrder)
+			protected.PUT("/returns/:id/sales", handler.UpdateSalesReturnOrder)
 			protected.POST("/returns/:id/confirm", handler.ConfirmReturnOrder)
 			protected.DELETE("/returns/:id", handler.DeleteReturnOrder)
 
@@ -302,11 +313,17 @@ func main() {
 			protected.GET("/trace/material/serial", handler.TraceMaterialBySerial)
 			protected.GET("/dashboard/bigscreen", handler.GetBigscreenDashboard)
 
-			// Sku Serial Code Routes
-			protected.GET("/sku-serial/stock-in-item/:id", handler.GetSerialCodesByStockInItem)
-			protected.GET("/sku-serial/stock-in-item/:id/available-issued", handler.GetAvailableIssuedSerialCodesByStockInItem)
-			protected.GET("/sku-serial/stock-out-item/:id", handler.GetSerialCodesByStockOutItem)
-			protected.GET("/sku-serial/stock-out-item/:id/available", handler.GetAvailableSerialCodesByStockOutItem)
+			// Material Serial Code Routes
+			protected.GET("/serial-codes/stock-in-item/:id", handler.GetMaterialSerialCodesByStockInItem)
+			protected.GET("/serial-codes/stock-in-item/:id/available-issued", handler.GetAvailableIssuedMaterialSerialCodesByStockInItem)
+			protected.GET("/serial-codes/stock-out-item/:id", handler.GetMaterialSerialCodesByStockOutItem)
+			protected.GET("/serial-codes/stock-out-item/:id/available", handler.GetAvailableMaterialSerialCodesByStockOutItem)
+
+			// Legacy Serial Code Route Aliases
+			protected.GET("/sku-serial/stock-in-item/:id", handler.GetMaterialSerialCodesByStockInItem)
+			protected.GET("/sku-serial/stock-in-item/:id/available-issued", handler.GetAvailableIssuedMaterialSerialCodesByStockInItem)
+			protected.GET("/sku-serial/stock-out-item/:id", handler.GetMaterialSerialCodesByStockOutItem)
+			protected.GET("/sku-serial/stock-out-item/:id/available", handler.GetAvailableMaterialSerialCodesByStockOutItem)
 
 			// Report Routes
 			protected.GET("/reports/stock-in", handler.ReportStockInSummary)

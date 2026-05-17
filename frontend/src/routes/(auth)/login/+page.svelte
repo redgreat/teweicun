@@ -76,7 +76,7 @@
 
 			<div class="w-full space-y-4">
 				<div class="form-control">
-					<label class="label mb-1">
+					<label class="label mb-1" for="login-username">
 						<span class="label-text ml-1 font-medium text-slate-300">用户名</span>
 					</label>
 					<div class="group relative">
@@ -87,6 +87,7 @@
 							/>
 						</div>
 						<input
+							id="login-username"
 							type="text"
 							placeholder="输入账号"
 							bind:value={username}
@@ -96,7 +97,7 @@
 				</div>
 
 				<div class="form-control">
-					<label class="label mb-1">
+					<label class="label mb-1" for="login-password">
 						<span class="label-text ml-1 font-medium text-slate-300">密码</span>
 					</label>
 					<div class="group relative">
@@ -107,6 +108,7 @@
 							/>
 						</div>
 						<input
+							id="login-password"
 							type="password"
 							placeholder="输入密码"
 							bind:value={password}

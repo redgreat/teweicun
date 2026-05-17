@@ -150,7 +150,7 @@
 				/>
 				<div class="relative w-40">
 					<select
-						class="select select-sm select-bordered w-full text-transparent [&_option]:text-base-content"
+						class="select select-sm select-bordered [&_option]:text-base-content w-full text-transparent"
 						bind:value={filters.category_id}
 					>
 						<option value="">全部分类</option>
@@ -158,7 +158,9 @@
 							<option value={String(c.id)}>{c.display_name}</option>
 						{/each}
 					</select>
-					<span class="text-base-content pointer-events-none absolute inset-y-0 left-3 right-7 flex items-center truncate text-xs">
+					<span
+						class="text-base-content pointer-events-none absolute inset-y-0 right-7 left-3 flex items-center truncate text-xs"
+					>
 						{#if !filters.category_id}
 							<span class="text-base-content/60">全部分类</span>
 						{:else}
@@ -191,7 +193,10 @@
 					>{value || '-'}</span
 				>
 			{:else if key === 'material_display_name'}
-				<span class="block w-[340px] truncate" title={row.material_display_name || row.material_name || ''}>
+				<span
+					class="block w-[340px] truncate"
+					title={row.material_display_name || row.material_name || ''}
+				>
 					{row.material_display_name || row.material_name || '-'}
 				</span>
 			{:else}

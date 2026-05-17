@@ -20,6 +20,10 @@ func GetConsumptionOrderDetail(ctx context.Context, id int64) (*response.Consump
 	return db.GetConsumptionOrderDetail(ctx, id)
 }
 
+func UpdateConsumptionOrder(ctx context.Context, id int64, req request.ConsumptionOrderUpdate, userID int64, username string) error {
+	return db.UpdateConsumptionOrder(ctx, id, req, userID, username)
+}
+
 func UpdateConsumptionOrderStatus(ctx context.Context, id int64, status string, userID int64) error {
 	return db.UpdateConsumptionOrderStatus(ctx, id, status, userID)
 }

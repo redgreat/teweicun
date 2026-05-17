@@ -46,9 +46,6 @@ type StockInItemResp struct {
 	MaterialCode     string              `json:"material_code"`
 	MaterialName     string              `json:"material_name"`
 	IsCode           bool                `json:"is_code"`
-	SKUID            *int64              `json:"sku_id"`
-	SKUCode          string              `json:"sku_code"`
-	SKUName          string              `json:"sku_name"`
 	PurchaseQuantity float64             `json:"purchase_quantity"`
 	ReceivedQuantity float64             `json:"received_quantity"`
 	ArrivedQuantity  float64             `json:"arrived_quantity"`

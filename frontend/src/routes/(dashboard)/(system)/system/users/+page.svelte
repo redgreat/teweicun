@@ -211,10 +211,11 @@
 	<div class="space-y-4">
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"
+				<label class="label" for="system-user-username"
 					><span class="label-text flex items-center gap-2"><User size={14} /> 用户名</span></label
 				>
 				<input
+					id="system-user-username"
 					type="text"
 					bind:value={form.username}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -222,11 +223,12 @@
 				/>
 			</div>
 			<div class="form-control">
-				<label class="label"
+				<label class="label" for="system-user-password"
 					><span class="label-text flex items-center gap-2"><KeyRound size={14} /> 初始密码</span
 					></label
 				>
 				<input
+					id="system-user-password"
 					type="password"
 					bind:value={form.password}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -237,8 +239,11 @@
 
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"><span class="label-text">真实姓名</span></label>
+				<label class="label" for="system-user-real-name"
+					><span class="label-text">真实姓名</span></label
+				>
 				<input
+					id="system-user-real-name"
 					type="text"
 					bind:value={form.real_name}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -246,11 +251,12 @@
 				/>
 			</div>
 			<div class="form-control">
-				<label class="label"
+				<label class="label" for="system-user-department"
 					><span class="label-text flex items-center gap-2"><Building2 size={14} /> 部门</span
 					></label
 				>
 				<input
+					id="system-user-department"
 					type="text"
 					bind:value={form.department}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -261,10 +267,11 @@
 
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"
+				<label class="label" for="system-user-phone"
 					><span class="label-text flex items-center gap-2"><Phone size={14} /> 手机号</span></label
 				>
 				<input
+					id="system-user-phone"
 					type="text"
 					bind:value={form.phone}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -272,10 +279,11 @@
 				/>
 			</div>
 			<div class="form-control">
-				<label class="label"
+				<label class="label" for="system-user-email"
 					><span class="label-text flex items-center gap-2"><Mail size={14} /> 邮箱</span></label
 				>
 				<input
+					id="system-user-email"
 					type="email"
 					bind:value={form.email}
 					class="input input-bordered bg-base-200/50 w-full"

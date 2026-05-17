@@ -13,9 +13,6 @@ type ReturnOrderItemResp struct {
 	MaterialID        int64   `json:"material_id"`
 	MaterialCode      string  `json:"material_code"`
 	MaterialName      string  `json:"material_name"`
-	SKUID             int64   `json:"sku_id"`
-	SKUCode           string  `json:"sku_code"`
-	SKUName           string  `json:"sku_name"`
 	InventoryID       int64   `json:"inventory_id"`
 	WarehouseCode     string  `json:"warehouse_code"`
 	WarehouseName     string  `json:"warehouse_name"`
@@ -35,8 +32,12 @@ type ReturnOrderResp struct {
 	WarehouseName string                `json:"warehouse_name"`
 	SupplierCode  string                `json:"supplier_code"`
 	SupplierName  string                `json:"supplier_name"`
+	CustomerCode  string                `json:"customer_code"`
+	CustomerName  string                `json:"customer_name"`
 	StockOutID    *int64                `json:"stock_out_id"`
 	StockOutNo    string                `json:"stock_out_no"`
+	StockInID     int64                 `json:"stock_in_id"`
+	StockInNo     string                `json:"stock_in_no"`
 	ReturnDate    time.Time             `json:"return_date"`
 	Status        string                `json:"status"`
 	TotalAmount   float64               `json:"total_amount"`

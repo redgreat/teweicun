@@ -20,6 +20,10 @@ func GetReversalOrderDetail(ctx context.Context, id int64) (*response.ReversalOr
 	return db.GetReversalOrderDetail(ctx, id)
 }
 
+func UpdateReversalOrder(ctx context.Context, id int64, req request.ReversalOrderUpdate, userID int64, username string) error {
+	return db.UpdateReversalOrder(ctx, id, req, userID, username)
+}
+
 func UpdateReversalOrderStatus(ctx context.Context, id int64, status string, userID int64) error {
 	return db.UpdateReversalOrderStatus(ctx, id, status, userID)
 }

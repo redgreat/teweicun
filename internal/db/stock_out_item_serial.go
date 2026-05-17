@@ -63,7 +63,7 @@ func UpdateStockOutItemSerialSelections(ctx context.Context, stockOutItemID int6
 		var serialCode string
 		if err := tx.QueryRow(ctx, `
 			SELECT serial_code
-			FROM sku_serial_code
+			FROM material_serial_code
 			WHERE id = $1
 			  AND inventory_id = $2
 			  AND status = 'in_stock'

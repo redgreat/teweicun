@@ -94,6 +94,32 @@ func ConfirmSalesOrder(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+func UpdateSalesOrder(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, errcode.ErrInvalidParam)
+		return
+	}
+
+	var req request.UpdateSalesOrderReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
+		return
+	}
+
+	userID, _ := middleware.GetUserID(c)
+	usernameVal, _ := c.Get("username")
+	username := usernameVal.(string)
+
+	err = service.UpdateSalesOrder(c.Request.Context(), id, &req, userID, username)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 func CancelSalesOrder(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -131,11 +157,11 @@ func ShipSalesOrder(c *gin.Context) {
 	usernameVal, _ := c.Get("username")
 	username := usernameVal.(string)
 
-	err = service.ShipSalesOrder(c.Request.Context(), id, &req, userID, username)
+	stockOutID, err := service.ShipSalesOrder(c.Request.Context(), id, &req, userID, username)
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
 
-	response.Success(c, nil)
+	response.Success(c, gin.H{"stock_out_id": stockOutID})
 }

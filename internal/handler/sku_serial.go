@@ -9,7 +9,7 @@ import (
 	"github.com/redgreat/teweicun/internal/service"
 )
 
-func GetSerialCodesByStockInItem(c *gin.Context) {
+func GetMaterialSerialCodesByStockInItem(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -17,7 +17,7 @@ func GetSerialCodesByStockInItem(c *gin.Context) {
 		return
 	}
 
-	result, err := service.GetSerialCodesByStockInItem(c.Request.Context(), id)
+	result, err := service.GetMaterialSerialCodesByStockInItem(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -25,7 +25,7 @@ func GetSerialCodesByStockInItem(c *gin.Context) {
 	response.Success(c, result)
 }
 
-func GetSerialCodesByStockOutItem(c *gin.Context) {
+func GetMaterialSerialCodesByStockOutItem(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -33,7 +33,7 @@ func GetSerialCodesByStockOutItem(c *gin.Context) {
 		return
 	}
 
-	result, err := service.GetSerialCodesByStockOutItem(c.Request.Context(), id)
+	result, err := service.GetMaterialSerialCodesByStockOutItem(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -41,7 +41,7 @@ func GetSerialCodesByStockOutItem(c *gin.Context) {
 	response.Success(c, result)
 }
 
-func GetAvailableSerialCodesByStockOutItem(c *gin.Context) {
+func GetAvailableMaterialSerialCodesByStockOutItem(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -49,7 +49,7 @@ func GetAvailableSerialCodesByStockOutItem(c *gin.Context) {
 		return
 	}
 
-	result, err := service.GetAvailableSerialCodesByStockOutItem(c.Request.Context(), id)
+	result, err := service.GetAvailableMaterialSerialCodesByStockOutItem(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -57,7 +57,7 @@ func GetAvailableSerialCodesByStockOutItem(c *gin.Context) {
 	response.Success(c, result)
 }
 
-func GetAvailableIssuedSerialCodesByStockInItem(c *gin.Context) {
+func GetAvailableIssuedMaterialSerialCodesByStockInItem(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -65,7 +65,7 @@ func GetAvailableIssuedSerialCodesByStockInItem(c *gin.Context) {
 		return
 	}
 
-	result, err := service.GetAvailableIssuedSerialCodesByStockInItem(c.Request.Context(), id)
+	result, err := service.GetAvailableIssuedMaterialSerialCodesByStockInItem(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, err)
 		return

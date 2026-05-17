@@ -2,7 +2,7 @@
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { ArrowLeft, FileText, Calendar, BadgeCheck, ClipboardList } from 'lucide-svelte';
 	import { getStatusStyle } from '$lib/statusStyles';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
@@ -48,7 +48,7 @@
 	}
 
 	onMount(() => {
-		const id = Number($page.params.id);
+		const id = Number(page.params.id);
 		if (!id) {
 			toast.error('无效的订单ID');
 			loading = false;

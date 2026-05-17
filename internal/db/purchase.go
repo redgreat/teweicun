@@ -142,7 +142,17 @@ func GetPurchaseOrderByID(ctx context.Context, id int64) (*response.PurchaseOrde
 		SELECT po.id, po.order_no,
 		       po.supplier_code, COALESCE(s.supplier_name, ''),
 		       po.order_date, po.expected_date, po.order_status, po.total_amount,
-		       po.remark, po.created_at, po.updated_at
+		       po.remark, po.created_at, po.updated_at,
+		       COALESCE((
+		           SELECT si.id FROM stock_in si
+		           WHERE si.purchase_order_id = po.id AND si.deleted_at IS NULL
+		           ORDER BY si.id DESC LIMIT 1
+		       ), 0),
+		       COALESCE((
+		           SELECT si.stock_in_no FROM stock_in si
+		           WHERE si.purchase_order_id = po.id AND si.deleted_at IS NULL
+		           ORDER BY si.id DESC LIMIT 1
+		       ), '')
 		FROM purchase_order po
 		LEFT JOIN supplier s ON s.supplier_code = po.supplier_code
 		WHERE po.id = $1 AND po.deleted_at IS NULL
@@ -152,6 +162,7 @@ func GetPurchaseOrderByID(ctx context.Context, id int64) (*response.PurchaseOrde
 		&order.SupplierCode, &order.SupplierName,
 		&order.OrderDate, &order.ExpectedDate, &order.OrderStatus, &order.TotalAmount,
 		&order.Remark, &order.CreatedAt, &order.UpdatedAt,
+		&order.StockInID, &order.StockInNo,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -164,7 +175,7 @@ func GetPurchaseOrderByID(ctx context.Context, id int64) (*response.PurchaseOrde
 	order.OrderStatusName = getOrderStatusName(order.OrderStatus)
 
 	itemsQuery := `
-		SELECT poi.id, poi.material_id, NULL::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
+		SELECT poi.id, poi.material_id,
 		       m.material_code, m.material_name,
 		       poi.quantity, COALESCE(m.unit, ''), poi.unit_price, poi.amount, poi.received_quantity
 		FROM purchase_order_item poi
@@ -180,7 +191,7 @@ func GetPurchaseOrderByID(ctx context.Context, id int64) (*response.PurchaseOrde
 
 	for rows.Next() {
 		var item response.PurchaseOrderItemResp
-		if err := rows.Scan(&item.ID, &item.MaterialID, &item.SKUID, &item.SKUCode, &item.SKUName,
+		if err := rows.Scan(&item.ID, &item.MaterialID,
 			&item.MaterialCode, &item.MaterialName,
 			&item.Quantity, &item.Unit, &item.UnitPrice, &item.Amount,
 			&item.ReceivedQuantity); err != nil {
@@ -283,30 +294,70 @@ func CreatePurchaseOrder(ctx context.Context, req *request.CreatePurchaseOrderRe
 		}
 	}
 
+	if _, err := tx.Exec(ctx, `UPDATE purchase_order SET total_amount = (SELECT SUM(quantity * unit_price) FROM purchase_order_item WHERE order_id = $1) WHERE id = $1`, orderID); err != nil {
+		return 0, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return 0, err
+	}
+
+	if err := ConfirmPurchaseOrder(ctx, orderID, userID); err != nil {
+		return 0, fmt.Errorf("订单创建成功但自动确认失败: %w", err)
 	}
 
 	return orderID, nil
 }
 
-func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurchaseOrderReq) error {
-	if err := ensurePurchaseOrderDraft(ctx, id); err != nil {
-		return err
-	}
-
+func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurchaseOrderReq, userID int64) error {
 	tx, err := database.Pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
+	var orderStatus string
 	var orderType string
-	err = tx.QueryRow(ctx, `SELECT COALESCE(order_type,'purchase') FROM purchase_order WHERE id = $1 AND deleted_at IS NULL`, id).Scan(&orderType)
+	err = tx.QueryRow(ctx, `
+		SELECT COALESCE(order_status, 'draft'), COALESCE(order_type, 'purchase')
+		FROM purchase_order WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE
+	`, id).Scan(&orderStatus, &orderType)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return errcode.ErrNotFound
 		}
+		return err
+	}
+
+	if orderStatus != "ordered" {
+		return errcode.NewAppError(errcode.ErrForbidden.Code, "仅待收货状态允许编辑", errcode.ErrForbidden.HTTPCode)
+	}
+
+	var hasReceived bool
+	err = tx.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM purchase_order_item
+			WHERE order_id = $1 AND COALESCE(received_quantity, 0) > 0
+		)
+	`, id).Scan(&hasReceived)
+	if err != nil {
+		return err
+	}
+	if hasReceived {
+		return errcode.NewAppError(errcode.ErrForbidden.Code, "已有入库记录，不可编辑", errcode.ErrForbidden.HTTPCode)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM stock_in_item WHERE stock_in_id IN (
+			SELECT id FROM stock_in WHERE purchase_order_id = $1 AND stock_in_status = 'preparing'
+		)
+	`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM stock_in WHERE purchase_order_id = $1 AND stock_in_status = 'preparing'
+	`, id); err != nil {
 		return err
 	}
 
@@ -315,26 +366,19 @@ func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurch
 		expectedDate = strings.TrimSpace(req.ExpectedDate)
 	}
 
-	updateQuery := `
+	if _, err = tx.Exec(ctx, `
 		UPDATE purchase_order
 		SET expected_date = $1, remark = $2, updated_at = NOW()
 		WHERE id = $3 AND deleted_at IS NULL
-	`
-	_, err = tx.Exec(ctx, updateQuery, expectedDate, req.Remark, id)
-	if err != nil {
+	`, expectedDate, req.Remark, id); err != nil {
 		return err
 	}
 
 	if len(req.Items) > 0 {
-		_, err = tx.Exec(ctx, "DELETE FROM purchase_order_item WHERE order_id = $1", id)
-		if err != nil {
+		if _, err = tx.Exec(ctx, "DELETE FROM purchase_order_item WHERE order_id = $1", id); err != nil {
 			return err
 		}
 
-		itemQuery := `
-			INSERT INTO purchase_order_item (order_id, material_id, quantity, unit_price, custom_attributes)
-			VALUES ($1, $2, $3, $4, $5)
-		`
 		for _, item := range req.Items {
 			materialID := item.MaterialID
 			customAttributes := []byte("[]")
@@ -342,25 +386,30 @@ func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurch
 				return fmt.Errorf("采购订货明细必须选择物料")
 			}
 			if orderType == "purchase" {
-				err := tx.QueryRow(ctx, `
+				if err := tx.QueryRow(ctx, `
 					SELECT COALESCE(custom_attributes, '[]'::jsonb)
 					FROM material WHERE id = $1 AND deleted_at IS NULL
-				`, materialID).Scan(&customAttributes)
-				if err != nil {
+				`, materialID).Scan(&customAttributes); err != nil {
 					if err == pgx.ErrNoRows {
 						return fmt.Errorf("物料不存在或已删除")
 					}
 					return err
 				}
 			}
-			_, err := tx.Exec(ctx, itemQuery, id, materialID, item.Quantity, item.UnitPrice, customAttributes)
-			if err != nil {
+			if _, err = tx.Exec(ctx, `
+				INSERT INTO purchase_order_item (order_id, material_id, quantity, unit_price, custom_attributes)
+				VALUES ($1, $2, $3, $4, $5)
+			`, id, materialID, item.Quantity, item.UnitPrice, customAttributes); err != nil {
 				return err
 			}
 		}
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	return ConfirmPurchaseOrder(ctx, id, userID)
 }
 
 func DeletePurchaseOrder(ctx context.Context, id int64) error {

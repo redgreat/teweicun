@@ -30,23 +30,14 @@ func ConfirmSalesOrder(ctx context.Context, id int64, userID int64, username str
 	return db.ConfirmSalesOrder(ctx, id, userID, username)
 }
 
+func UpdateSalesOrder(ctx context.Context, id int64, req *request.UpdateSalesOrderReq, userID int64, username string) error {
+	return db.UpdateSalesOrder(ctx, id, req, userID, username)
+}
+
 func CancelSalesOrder(ctx context.Context, id int64, userID int64, username string) error {
 	return db.CancelSalesOrder(ctx, id, userID, username)
 }
 
-func ShipSalesOrder(ctx context.Context, id int64, req *request.ShipSalesOrderReq, userID int64, username string) error {
-	var items []struct {
-		MaterialID int64
-		Quantity   float64
-	}
-	for _, item := range req.Items {
-		items = append(items, struct {
-			MaterialID int64
-			Quantity   float64
-		}{
-			MaterialID: item.MaterialID,
-			Quantity:   item.Quantity,
-		})
-	}
-	return db.ShipSalesOrder(ctx, id, items, userID, username)
+func ShipSalesOrder(ctx context.Context, id int64, req *request.ShipSalesOrderReq, userID int64, username string) (int64, error) {
+	return db.ShipSalesOrder(ctx, id, req, userID, username)
 }

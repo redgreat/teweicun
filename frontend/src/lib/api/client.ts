@@ -43,7 +43,33 @@ api.interceptors.response.use(
 			auth.logout();
 			window.location.href = '/login';
 		}
-		return Promise.reject(error.response?.data || error.message);
+		const data = error.response?.data;
+		if (data && typeof data === 'object') {
+			if ('code' in data || 'msg' in data) {
+				const msg = (data as any).msg || (data as any).message || '请求失败';
+				const code = (data as any).code ?? error.response?.status ?? -1;
+				return Promise.reject({ message: msg, code, data });
+			}
+			if ('message' in data) {
+				return Promise.reject({
+					message: (data as any).message,
+					code: error.response?.status ?? -1,
+					data
+				});
+			}
+			return Promise.reject({
+				message: JSON.stringify(data),
+				code: error.response?.status ?? -1,
+				data
+			});
+		}
+		if (typeof data === 'string' && data.trim() !== '') {
+			return Promise.reject({ message: data, code: error.response?.status ?? -1, data });
+		}
+		return Promise.reject({
+			message: error.message || '请求失败',
+			code: error.response?.status ?? -1
+		});
 	}
 );
 

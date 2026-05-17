@@ -182,8 +182,6 @@ func GetStockInByID(ctx context.Context, id int64) (*response.StockInDetailResp,
 
 	itemQuery := `
 		SELECT sii.id, sii.material_id, m.material_code, m.material_name, m.is_code,
-		       0::bigint AS sku_id,
-		       ''::varchar AS sku_code, ''::varchar AS sku_name,
 		       COALESCE(poi.quantity, sii.arrived_quantity) AS purchase_quantity,
 		       CASE
 		           WHEN COALESCE(sbi.stock_in_type, '') = 'reversal' THEN sii.accepted_quantity
@@ -208,7 +206,6 @@ func GetStockInByID(ctx context.Context, id int64) (*response.StockInDetailResp,
 	for rows.Next() {
 		var item response.StockInItemResp
 		if err := rows.Scan(&item.ID, &item.MaterialID, &item.MaterialCode, &item.MaterialName, &item.IsCode,
-			&item.SKUID, &item.SKUCode, &item.SKUName,
 			&item.PurchaseQuantity, &item.ReceivedQuantity,
 			&item.ArrivedQuantity, &item.AcceptedQuantity,
 			&item.PendingQuantity,
@@ -282,7 +279,7 @@ func ConfirmStockIn(ctx context.Context, stockInID, userID int64) error {
 // ConfirmReversalStockIn 退料入库确认：
 // - 必须 stock_in_type = 'reversal'
 // - 必须已备货编码（选中数量=accepted_quantity）
-// - 将 sku_serial_code 从 issued -> in_stock，并回补 inventory.quantity
+// - 将 material_serial_code 从 issued -> in_stock，并回补 inventory.quantity
 // - 入库单直接置为 passed，同时把关联退料单置为已完成
 func ConfirmReversalStockIn(ctx context.Context, stockInID, userID int64) error {
 	tx, err := database.Pool.Begin(ctx)
@@ -424,7 +421,7 @@ func ConfirmReversalStockIn(ctx context.Context, stockInID, userID int64) error 
 			var serialCode string
 			if err := tx.QueryRow(ctx, `
 				SELECT inventory_id, status, serial_code
-				FROM sku_serial_code
+				FROM material_serial_code
 				WHERE id = $1
 				FOR UPDATE
 			`, serialID).Scan(&invID, &status, &serialCode); err != nil {
@@ -440,7 +437,7 @@ func ConfirmReversalStockIn(ctx context.Context, stockInID, userID int64) error 
 			}
 			// 编码回库
 			if _, err := tx.Exec(ctx, `
-				UPDATE sku_serial_code
+				UPDATE material_serial_code
 				SET status = 'in_stock',
 				    stock_in_id = $2,
 				    stock_in_item_id = $3,
@@ -451,7 +448,7 @@ func ConfirmReversalStockIn(ctx context.Context, stockInID, userID int64) error 
 			}
 			// 追溯记录
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO sku_serial_trace (serial_code_id, serial_code, action, ref_doc_type, ref_doc_no, ref_doc_id, operator_id, remark)
+				INSERT INTO material_serial_trace (serial_code_id, serial_code, action, ref_doc_type, ref_doc_no, ref_doc_id, operator_id, remark)
 				VALUES ($1, $2, 'stock_in', 'stock_in', $3, $4, $5, '退料入库确认回库')
 			`, serialID, serialCode, stockInNo, stockInID, userID); err != nil {
 				return err

@@ -22,9 +22,6 @@ type DashboardTopItem struct {
 	MaterialID   int64   `json:"material_id"`
 	MaterialCode string  `json:"material_code"`
 	MaterialName string  `json:"material_name"`
-	SKUID        int64   `json:"sku_id"`
-	SKUCode      string  `json:"sku_code"`
-	SKUName      string  `json:"sku_name"`
 	Quantity     float64 `json:"quantity"`
 	Amount       float64 `json:"amount"`
 }
@@ -32,7 +29,7 @@ type DashboardTopItem struct {
 type DashboardBusinessSummary struct {
 	PurchaseMinusConsumptionAmount float64 `json:"purchase_minus_consumption_amount"`
 	ActiveMaterialCount            int64   `json:"active_material_count"`
-	ActiveSKUCount                 int64   `json:"active_sku_count"`
+	ActiveSerialCount              int64   `json:"active_serial_count"`
 	MaxSingleConsumptionAmount     float64 `json:"max_single_consumption_amount"`
 }
 
@@ -46,4 +43,3 @@ type DashboardBigscreenResp struct {
 	TopConsumptionQty    []DashboardTopItem       `json:"top_consumption_qty"`
 	Summary              DashboardBusinessSummary `json:"summary"`
 }
-

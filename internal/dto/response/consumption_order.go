@@ -33,9 +33,6 @@ type ConsumptionOrderItemResp struct {
 	MaterialCode string  `json:"material_code"`
 	MaterialName string  `json:"material_name"`
 	InventoryID  int64   `json:"inventory_id"`
-	SKUID        int64   `json:"sku_id"`
-	SKUCode      string  `json:"sku_code"`
-	SKUName      string  `json:"sku_name"`
 	Quantity     float64 `json:"quantity"`
 	Unit         string  `json:"unit"`
 	UnitCost     float64 `json:"unit_cost,omitempty"`

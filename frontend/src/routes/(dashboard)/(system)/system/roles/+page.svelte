@@ -188,11 +188,12 @@
 	<div class="space-y-4">
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"
+				<label class="label" for="role-code"
 					><span class="label-text flex items-center gap-2"><Shield size={14} /> 角色编码</span
 					></label
 				>
 				<input
+					id="role-code"
 					type="text"
 					bind:value={form.role_code}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -200,8 +201,9 @@
 				/>
 			</div>
 			<div class="form-control">
-				<label class="label"><span class="label-text">角色名称</span></label>
+				<label class="label" for="role-name"><span class="label-text">角色名称</span></label>
 				<input
+					id="role-name"
 					type="text"
 					bind:value={form.role_name}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -211,8 +213,9 @@
 		</div>
 
 		<div class="form-control">
-			<label class="label"><span class="label-text">角色描述</span></label>
+			<label class="label" for="role-description"><span class="label-text">角色描述</span></label>
 			<textarea
+				id="role-description"
 				bind:value={form.description}
 				class="textarea textarea-bordered bg-base-200/50 h-20"
 				placeholder="描述该角色的职责范围"

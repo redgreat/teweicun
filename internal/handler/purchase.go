@@ -88,7 +88,8 @@ func UpdatePurchaseOrder(c *gin.Context) {
 		return
 	}
 
-	err = service.UpdatePurchaseOrder(c.Request.Context(), id, &req)
+	userID, _ := middleware.GetUserID(c)
+	err = service.UpdatePurchaseOrder(c.Request.Context(), id, &req, userID)
 	if err != nil {
 		response.Error(c, err)
 		return

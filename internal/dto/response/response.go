@@ -10,6 +10,7 @@ package response
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redgreat/teweicun/internal/pkg/errcode"
@@ -45,6 +46,14 @@ func Error(c *gin.Context, err error) {
 		c.JSON(appErr.HTTPCode, Response{
 			Code: appErr.Code,
 			Msg:  appErr.Msg,
+		})
+		return
+	}
+
+	if err != nil && strings.HasPrefix(err.Error(), "DB_ERROR: ") {
+		c.JSON(http.StatusBadRequest, Response{
+			Code: errcode.ErrInvalidParam.Code,
+			Msg:  strings.TrimPrefix(err.Error(), "DB_ERROR: "),
 		})
 		return
 	}

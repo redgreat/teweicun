@@ -36,9 +36,23 @@ type ReversalOrderItemCreate struct {
 }
 
 type ReversalOrderUpdate struct {
-	ProjectNo   string `json:"project_no" binding:"max=50"`
-	ProductName string `json:"product_name" binding:"max=200"`
-	Remark      string `json:"remark"`
+	ProjectNo     string                     `json:"project_no" binding:"max=50"`
+	ProductName   string                     `json:"product_name" binding:"max=200"`
+	WarehouseID   int64                      `json:"warehouse_id"`
+	WarehouseCode string                     `json:"warehouse_code"`
+	OrderDate     string                     `json:"order_date" binding:"max=10"`
+	DesignerID    int64                      `json:"designer_id" binding:"omitempty,min=1"`
+	DesignerName  string                     `json:"designer_name" binding:"omitempty,max=50"`
+	Remark        string                     `json:"remark"`
+	Items         []ReversalOrderItemUpdate  `json:"items" binding:"required,min=1,dive"`
+}
+
+type ReversalOrderItemUpdate struct {
+	InventoryID int64   `json:"inventory_id" binding:"required,min=1"`
+	MaterialID  int64   `json:"material_id"`
+	Quantity    float64 `json:"quantity" binding:"required,gt=0"`
+	Unit        string  `json:"unit" binding:"max=20"`
+	Remark      string  `json:"remark"`
 }
 
 type ReversalOrderConfirm struct {

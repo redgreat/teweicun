@@ -45,6 +45,16 @@ func ListReturnOrders(ctx context.Context, q *request.ReturnOrderQuery) ([]respo
 		args = append(args, q.SupplierCode)
 		argID++
 	}
+	if q.CustomerCode != "" {
+		where = append(where, fmt.Sprintf("ro.customer_code = $%d", argID))
+		args = append(args, q.CustomerCode)
+		argID++
+	}
+	if strings.TrimSpace(q.CustomerKeyword) != "" {
+		where = append(where, fmt.Sprintf("(COALESCE(ro.customer_name, c.customer_name, '') ILIKE $%d OR ro.customer_code ILIKE $%d)", argID, argID))
+		args = append(args, "%"+strings.TrimSpace(q.CustomerKeyword)+"%")
+		argID++
+	}
 	if q.StartDate != "" {
 		where = append(where, fmt.Sprintf("ro.return_date >= $%d", argID))
 		args = append(args, q.StartDate)
@@ -68,7 +78,9 @@ func ListReturnOrders(ctx context.Context, q *request.ReturnOrderQuery) ([]respo
 		SELECT ro.id, ro.return_no, ro.return_type, COALESCE(ro.ref_doc_type, ''), 
 		       ro.ref_doc_id, ro.warehouse_code, w.warehouse_name,
 		       COALESCE(ro.supplier_code, ''), COALESCE(s.supplier_name, ''),
-		       ro.stock_out_id, COALESCE(so.stock_out_no, ''),
+		       COALESCE(ro.customer_code, ''), COALESCE(ro.customer_name, c.customer_name, ''),
+		       COALESCE(ro.stock_out_id, 0), COALESCE(so.stock_out_no, ''),
+		       COALESCE(ro.stock_in_id, 0), COALESCE(si.stock_in_no, ''),
 		       ro.return_date, ro.return_status,
 		       COALESCE((
 		         SELECT SUM(roi.quantity * COALESCE(inv.unit_cost, 0))
@@ -80,7 +92,9 @@ func ListReturnOrders(ctx context.Context, q *request.ReturnOrderQuery) ([]respo
 		FROM return_order ro
 		LEFT JOIN warehouse w ON w.warehouse_code = ro.warehouse_code
 		LEFT JOIN supplier s ON s.supplier_code = ro.supplier_code
+		LEFT JOIN customer c ON c.customer_code = ro.customer_code AND c.deleted_at IS NULL
 		LEFT JOIN stock_out so ON so.id = ro.stock_out_id AND so.deleted_at IS NULL
+		LEFT JOIN stock_in si ON si.id = ro.stock_in_id AND si.deleted_at IS NULL
 		WHERE %s
 		ORDER BY ro.id DESC
 		LIMIT $%d OFFSET $%d
@@ -100,7 +114,9 @@ func ListReturnOrders(ctx context.Context, q *request.ReturnOrderQuery) ([]respo
 		if err := rows.Scan(&item.ID, &item.ReturnNo, &item.ReturnType, &item.RefDocType, &item.RefDocID,
 			&item.WarehouseCode, &item.WarehouseName,
 			&item.SupplierCode, &item.SupplierName,
+			&item.CustomerCode, &item.CustomerName,
 			&item.StockOutID, &item.StockOutNo,
+			&item.StockInID, &item.StockInNo,
 			&item.ReturnDate, &item.Status, &item.TotalAmount, &item.Remark, &item.CreatedAt); err != nil {
 			return nil, 0, err
 		}
@@ -116,19 +132,25 @@ func GetReturnOrderDetail(ctx context.Context, id int64) (*response.ReturnOrderR
 		SELECT ro.id, ro.return_no, ro.return_type, COALESCE(ro.ref_doc_type, ''), 
 		       ro.ref_doc_id, ro.warehouse_code, w.warehouse_name,
 		       COALESCE(ro.supplier_code, ''), COALESCE(s.supplier_name, ''),
-		       ro.stock_out_id, COALESCE(so.stock_out_no, ''),
+		       COALESCE(ro.customer_code, ''), COALESCE(ro.customer_name, c.customer_name, ''),
+		       COALESCE(ro.stock_out_id, 0), COALESCE(so.stock_out_no, ''),
+		       COALESCE(ro.stock_in_id, 0), COALESCE(si.stock_in_no, ''),
 		       ro.return_date, ro.return_status, COALESCE(ro.remark, ''), ro.created_at
 		FROM return_order ro
 		LEFT JOIN warehouse w ON w.warehouse_code = ro.warehouse_code
 		LEFT JOIN supplier s ON s.supplier_code = ro.supplier_code
+		LEFT JOIN customer c ON c.customer_code = ro.customer_code AND c.deleted_at IS NULL
 		LEFT JOIN stock_out so ON so.id = ro.stock_out_id AND so.deleted_at IS NULL
+		LEFT JOIN stock_in si ON si.id = ro.stock_in_id AND si.deleted_at IS NULL
 		WHERE ro.id = $1 AND ro.deleted_at IS NULL
 	`
 	var item response.ReturnOrderResp
 	err := database.Pool.QueryRow(ctx, query, id).Scan(&item.ID, &item.ReturnNo, &item.ReturnType, &item.RefDocType, &item.RefDocID,
 		&item.WarehouseCode, &item.WarehouseName,
 		&item.SupplierCode, &item.SupplierName,
+		&item.CustomerCode, &item.CustomerName,
 		&item.StockOutID, &item.StockOutNo,
+		&item.StockInID, &item.StockInNo,
 		&item.ReturnDate, &item.Status, &item.Remark, &item.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -137,7 +159,6 @@ func GetReturnOrderDetail(ctx context.Context, id int64) (*response.ReturnOrderR
 	// 查明细（含当前可用量、单价，供编辑页校验与展示）
 	itemQuery := `
 		SELECT roi.id, roi.material_id, m.material_code, m.material_name,
-		       0::bigint AS sku_id, ''::varchar AS sku_code, ''::varchar AS sku_name,
 		       COALESCE(roi.inventory_id, 0),
 		       COALESCE(roi.warehouse_code, ''), COALESCE(wh_line.warehouse_name, ''),
 		       roi.quantity, roi.unit,
@@ -158,7 +179,6 @@ func GetReturnOrderDetail(ctx context.Context, id int64) (*response.ReturnOrderR
 	for rows.Next() {
 		var sub response.ReturnOrderItemResp
 		if err := rows.Scan(&sub.ID, &sub.MaterialID, &sub.MaterialCode, &sub.MaterialName,
-			&sub.SKUID, &sub.SKUCode, &sub.SKUName,
 			&sub.InventoryID,
 			&sub.WarehouseCode, &sub.WarehouseName,
 			&sub.Quantity, &sub.Unit,
@@ -182,8 +202,43 @@ func CreateReturnOrder(ctx context.Context, req *request.CreateReturnOrderReq, u
 	if req.ReturnType == "purchase_return" && strings.TrimSpace(req.SupplierCode) == "" {
 		return 0, fmt.Errorf("采购退货必须选择供应商")
 	}
+	if req.ReturnType == "sales_return" && strings.TrimSpace(req.CustomerCode) == "" {
+		return 0, fmt.Errorf("销售退货必须选择客户")
+	}
 	var warehouseID int64
 	warehouseCode := strings.TrimSpace(req.WarehouseCode)
+	customerCode := strings.TrimSpace(req.CustomerCode)
+	customerName := ""
+
+	if req.ReturnType == "sales_return" {
+		if warehouseCode == "" {
+			return 0, fmt.Errorf("销售退货必须选择入库仓库")
+		}
+		if err := tx.QueryRow(ctx, `
+			SELECT id
+			FROM warehouse
+			WHERE warehouse_code = $1
+			  AND deleted_at IS NULL
+			  AND status = 'enabled'
+		`, warehouseCode).Scan(&warehouseID); err != nil {
+			if err == pgx.ErrNoRows {
+				return 0, fmt.Errorf("退货仓库不存在或已停用")
+			}
+			return 0, err
+		}
+		if err := tx.QueryRow(ctx, `
+			SELECT customer_name
+			FROM customer
+			WHERE customer_code = $1
+			  AND deleted_at IS NULL
+			  AND status = 'enabled'
+		`, customerCode).Scan(&customerName); err != nil {
+			if err == pgx.ErrNoRows {
+				return 0, fmt.Errorf("客户不存在或已停用")
+			}
+			return 0, err
+		}
+	}
 
 	// 1. 生成单号 (RT)
 	var returnNo string
@@ -196,14 +251,14 @@ func CreateReturnOrder(ctx context.Context, req *request.CreateReturnOrderReq, u
 	var id int64
 	mainQuery := `
 		INSERT INTO return_order (return_no, return_type, ref_doc_type, ref_doc_id, 
-		                         warehouse_id, warehouse_code, supplier_code,
+		                         warehouse_id, warehouse_code, supplier_code, customer_code, customer_name,
 		                         return_date, return_status, remark, created_by)
-		VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, 0), $5, $6, NULLIF($7, ''),
-		        $8, 'draft', $9, $10)
+		VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, 0), $5, $6, NULLIF($7, ''), NULLIF($8, ''), NULLIF($9, ''),
+		        $10, 'draft', $11, $12)
 		RETURNING id
 	`
 	err = tx.QueryRow(ctx, mainQuery, returnNo, req.ReturnType, req.RefDocType, req.RefDocID,
-		warehouseID, warehouseCode, req.SupplierCode,
+		warehouseID, warehouseCode, req.SupplierCode, customerCode, customerName,
 		req.ReturnDate, req.Remark, userID).Scan(&id)
 	if err != nil {
 		return 0, err
@@ -274,10 +329,20 @@ func CreateReturnOrder(ctx context.Context, req *request.CreateReturnOrderReq, u
 		return 0, err
 	}
 
-	return id, tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+
+	if req.ReturnType == "purchase_return" {
+		if err := ConfirmReturnOrder(ctx, id, userID, username); err != nil {
+			return 0, fmt.Errorf("退货单创建成功但自动提交失败: %w", err)
+		}
+	}
+
+	return id, nil
 }
 
-// UpdateReturnOrder 更新采购退货待提交单（替换明细，逻辑与创建时采购退货分支一致）
+// UpdateReturnOrder 更新采购退货单（待出库状态可编辑）
 func UpdateReturnOrder(ctx context.Context, id int64, req *request.UpdateReturnOrderReq, userID int64, username string) error {
 	tx, err := database.Pool.Begin(ctx)
 	if err != nil {
@@ -287,21 +352,59 @@ func UpdateReturnOrder(ctx context.Context, id int64, req *request.UpdateReturnO
 
 	var rt string
 	var st string
-	err = tx.QueryRow(ctx, `SELECT return_type, return_status FROM return_order WHERE id = $1 AND deleted_at IS NULL`, id).Scan(&rt, &st)
+	var stockOutID int64
+	err = tx.QueryRow(ctx, `
+		SELECT return_type, return_status, COALESCE(stock_out_id, 0)
+		FROM return_order WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE
+	`, id).Scan(&rt, &st, &stockOutID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return fmt.Errorf("退货单不存在")
 		}
 		return err
 	}
-	if st != "draft" {
-		return fmt.Errorf("仅待提交状态可编辑")
-	}
 	if rt != "purchase_return" {
-		return fmt.Errorf("仅支持编辑采购退货待提交单")
+		return fmt.Errorf("仅支持编辑采购退货单")
+	}
+	if st != "pending_out" {
+		return fmt.Errorf("仅待出库状态可编辑")
 	}
 	if strings.TrimSpace(req.SupplierCode) == "" {
 		return fmt.Errorf("采购退货必须选择供应商")
+	}
+
+	if stockOutID > 0 {
+		var stockOutStatus string
+		err = tx.QueryRow(ctx, `SELECT COALESCE(status, 'pending') FROM stock_out WHERE id = $1`, stockOutID).Scan(&stockOutStatus)
+		if err != nil && err != pgx.ErrNoRows {
+			return err
+		}
+		if stockOutStatus != "" && stockOutStatus != "pending" {
+			return fmt.Errorf("出库单已操作，不可编辑")
+		}
+
+		if _, err := tx.Exec(ctx, `
+			UPDATE inventory
+			SET in_transit_quantity = GREATEST(COALESCE(in_transit_quantity, 0) - src.qty, 0),
+			    updated_at = NOW()
+			FROM (
+				SELECT soi.inventory_id, SUM(soi.quantity) AS qty
+				FROM stock_out_item soi
+				WHERE soi.stock_out_id = $1 AND COALESCE(soi.inventory_id, 0) <> 0
+				GROUP BY soi.inventory_id
+			) src
+			WHERE inventory.id = src.inventory_id
+		`, stockOutID); err != nil {
+			return err
+		}
+
+		if _, err := tx.Exec(ctx, `DELETE FROM stock_out_item WHERE stock_out_id = $1`, stockOutID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM stock_out WHERE id = $1`, stockOutID); err != nil {
+			return err
+		}
 	}
 
 	if _, err = tx.Exec(ctx, `DELETE FROM return_order_item WHERE return_id = $1`, id); err != nil {
@@ -322,12 +425,11 @@ func UpdateReturnOrder(ctx context.Context, id int64, req *request.UpdateReturnO
 		var invWarehouseCode string
 
 		err = tx.QueryRow(ctx, `
-				SELECT i.material_id, i.unit,
-				       i.warehouse_id, w.warehouse_code
-				FROM inventory i
-				INNER JOIN warehouse w ON w.id = i.warehouse_id
-				WHERE i.id = $1
-			`, item.InventoryID).Scan(&materialID, &unit, &invWarehouseID, &invWarehouseCode)
+			SELECT i.material_id, i.unit, i.warehouse_id, w.warehouse_code
+			FROM inventory i
+			INNER JOIN warehouse w ON w.id = i.warehouse_id
+			WHERE i.id = $1
+		`, item.InventoryID).Scan(&materialID, &unit, &invWarehouseID, &invWarehouseCode)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				return fmt.Errorf("库存不存在")
@@ -338,47 +440,133 @@ func UpdateReturnOrder(ctx context.Context, id int64, req *request.UpdateReturnO
 		if warehouseID == 0 {
 			warehouseID = invWarehouseID
 			warehouseCode = invWarehouseCode
-			if _, err = tx.Exec(ctx, `UPDATE return_order SET warehouse_id = $1, warehouse_code = $2, updated_at = NOW(), updated_by = $3 WHERE id = $4`, warehouseID, warehouseCode, userID, id); err != nil {
-				return err
-			}
 		}
 
-		itemQuery := `
-				INSERT INTO return_order_item (return_id, inventory_id, material_id, quantity, unit, warehouse_id, warehouse_code)
-				VALUES ($1, $2, $3, $4, $5, $6, $7)
-			`
-		if _, err = tx.Exec(ctx, itemQuery, id, item.InventoryID, materialID, item.Quantity, unit, invWarehouseID, invWarehouseCode); err != nil {
+		if _, err = tx.Exec(ctx, `
+			INSERT INTO return_order_item (return_id, inventory_id, material_id, quantity, unit, warehouse_id, warehouse_code)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, id, item.InventoryID, materialID, item.Quantity, unit, invWarehouseID, invWarehouseCode); err != nil {
 			return err
 		}
 	}
 
-	cmdTag, err := tx.Exec(ctx, `
+	if _, err = tx.Exec(ctx, `
 		UPDATE return_order
-		SET return_date = $1,
-		    remark = $2,
-		    supplier_code = NULLIF($3, ''),
-		    warehouse_id = $4,
-		    warehouse_code = $5,
-		    updated_at = NOW(),
-		    updated_by = $6
+		SET return_date = $1, remark = $2, supplier_code = NULLIF($3, ''),
+		    warehouse_id = $4, warehouse_code = $5, stock_out_id = NULL,
+		    updated_at = NOW(), updated_by = $6
 		WHERE id = $7
-		  AND deleted_at IS NULL
-		  AND return_status = 'draft'
-		  AND return_type = 'purchase_return'
-	`, req.ReturnDate, req.Remark, req.SupplierCode, warehouseID, warehouseCode, userID, id)
-	if err != nil {
+	`, req.ReturnDate, req.Remark, req.SupplierCode, warehouseID, warehouseCode, userID, id); err != nil {
 		return err
-	}
-	if cmdTag.RowsAffected() == 0 {
-		return fmt.Errorf("更新失败：单据状态已变更或不存在")
 	}
 
 	auditQuery := `CALL sp_write_audit_log($1, $2, $3, $4, $5, $6, $7)`
-	if _, err = tx.Exec(ctx, auditQuery, userID, username, "UPDATE", "RETURN", "return_order", id, nil); err != nil {
+	_, _ = tx.Exec(ctx, auditQuery, userID, username, "UPDATE", "RETURN", "return_order", id, nil)
+
+	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 
-	return tx.Commit(ctx)
+	return ConfirmReturnOrder(ctx, id, userID, username)
+}
+
+// UpdateSalesReturnOrder 更新销售退货单（待入库状态可编辑）
+func UpdateSalesReturnOrder(ctx context.Context, id int64, req *request.UpdateSalesReturnOrderReq, userID int64, username string) error {
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var rt string
+	var st string
+	var stockInID int64
+	err = tx.QueryRow(ctx, `
+		SELECT return_type, return_status, COALESCE(stock_in_id, 0)
+		FROM return_order WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE
+	`, id).Scan(&rt, &st, &stockInID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return fmt.Errorf("退货单不存在")
+		}
+		return err
+	}
+	if rt != "sales_return" {
+		return fmt.Errorf("仅支持编辑销售退货单")
+	}
+	if st != "draft" && st != "confirmed" {
+		return fmt.Errorf("仅待提交或待入库状态可编辑")
+	}
+
+	if stockInID > 0 {
+		if _, err := tx.Exec(ctx, `DELETE FROM stock_in_item WHERE stock_in_id = $1`, stockInID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM stock_in WHERE id = $1`, stockInID); err != nil {
+			return err
+		}
+	}
+
+	if _, err = tx.Exec(ctx, `DELETE FROM return_order_item WHERE return_id = $1`, id); err != nil {
+		return err
+	}
+
+	warehouseCode := strings.TrimSpace(req.WarehouseCode)
+	var warehouseID int64
+	if err := tx.QueryRow(ctx, `
+		SELECT id FROM warehouse
+		WHERE warehouse_code = $1 AND deleted_at IS NULL AND status = 'enabled'
+	`, warehouseCode).Scan(&warehouseID); err != nil {
+		if err == pgx.ErrNoRows {
+			return fmt.Errorf("退货仓库不存在或已停用")
+		}
+		return err
+	}
+
+	customerCode := strings.TrimSpace(req.CustomerCode)
+	var customerName string
+	if err := tx.QueryRow(ctx, `
+		SELECT customer_name FROM customer
+		WHERE customer_code = $1 AND deleted_at IS NULL AND status = 'enabled'
+	`, customerCode).Scan(&customerName); err != nil {
+		if err == pgx.ErrNoRows {
+			return fmt.Errorf("客户不存在或已停用")
+		}
+		return err
+	}
+
+	for _, item := range req.Items {
+		if item.MaterialID == 0 {
+			return fmt.Errorf("销售退货明细必须填写物料")
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO return_order_item (return_id, material_id, quantity, unit)
+			VALUES ($1, $2, $3, (SELECT unit FROM material WHERE id = $2))
+		`, id, item.MaterialID, item.Quantity); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE return_order
+		SET return_date = $1, remark = $2,
+		    customer_code = NULLIF($3, ''), customer_name = NULLIF($4, ''),
+		    warehouse_id = $5, warehouse_code = $6, stock_in_id = NULL,
+		    updated_at = NOW(), updated_by = $7
+		WHERE id = $8
+	`, req.ReturnDate, req.Remark, customerCode, customerName, warehouseID, warehouseCode, userID, id); err != nil {
+		return err
+	}
+
+	auditQuery := `CALL sp_write_audit_log($1, $2, $3, $4, $5, $6, $7)`
+	_, _ = tx.Exec(ctx, auditQuery, userID, username, "UPDATE", "RETURN", "return_order", id, nil)
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	return ConfirmReturnOrder(ctx, id, userID, username)
 }
 
 // ConfirmReturnOrder 确认退货（调用 SP）实现库存扣减或回库

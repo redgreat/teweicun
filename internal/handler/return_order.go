@@ -100,6 +100,32 @@ func UpdateReturnOrder(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+func UpdateSalesReturnOrder(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, errcode.ErrInvalidParam)
+		return
+	}
+
+	var req request.UpdateSalesReturnOrderReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
+		return
+	}
+
+	userID, _ := middleware.GetUserID(c)
+	usernameVal, _ := c.Get("username")
+	username := usernameVal.(string)
+
+	err = service.UpdateSalesReturnOrder(c.Request.Context(), id, &req, userID, username)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 func ConfirmReturnOrder(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

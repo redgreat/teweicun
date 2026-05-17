@@ -19,11 +19,13 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-func pickLedgerKeyword(materialName, legacySKUName string) string {
-	if strings.TrimSpace(materialName) != "" {
-		return materialName
+func bindInventoryMaterialLedgerQuery(c *gin.Context, q *request.InventoryMaterialLedgerQuery) error {
+	values := c.Request.URL.Query()
+	if strings.TrimSpace(values.Get("material_name")) == "" && strings.TrimSpace(values.Get("sku_name")) != "" {
+		values.Set("material_name", strings.TrimSpace(values.Get("sku_name")))
+		c.Request.URL.RawQuery = values.Encode()
 	}
-	return legacySKUName
+	return c.ShouldBindQuery(q)
 }
 
 func ListInventoryDetail(c *gin.Context) {
@@ -115,7 +117,7 @@ func ListInventoryIssued(c *gin.Context) {
 
 func ListInventoryMaterialLedger(c *gin.Context) {
 	var q request.InventoryMaterialLedgerQuery
-	if err := c.ShouldBindQuery(&q); err != nil {
+	if err := bindInventoryMaterialLedgerQuery(c, &q); err != nil {
 		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
 		return
 	}
@@ -164,7 +166,7 @@ func ListInventorySKUSerials(c *gin.Context) {
 
 func ExportInventoryMaterialLedger(c *gin.Context) {
 	var q request.InventoryMaterialLedgerQuery
-	if err := c.ShouldBindQuery(&q); err != nil {
+	if err := bindInventoryMaterialLedgerQuery(c, &q); err != nil {
 		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
 		return
 	}
@@ -282,7 +284,7 @@ func ExportInventoryMaterialLedger(c *gin.Context) {
 	_ = f.MergeCell(sheet, "A2", "K2")
 	_ = f.SetCellValue(sheet, "A2",
 		fmt.Sprintf("导出时间：%s  |  筛选：物料[%s] 仓库[%s] 价格区间[%.2f - %.2f]",
-			time.Now().Format("2006-01-02 15:04:05"), pickLedgerKeyword(q.MaterialName, q.SKUName), q.WarehouseName, q.PriceMin, q.PriceMax))
+			time.Now().Format("2006-01-02 15:04:05"), q.MaterialName, q.WarehouseName, q.PriceMin, q.PriceMax))
 	_ = f.SetCellStyle(sheet, "A2", "K2", subTitleStyle)
 
 	_ = f.MergeCell(sheet, "A3", "B3")

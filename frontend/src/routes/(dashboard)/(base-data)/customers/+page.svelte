@@ -169,9 +169,10 @@
 	<div class="space-y-6">
 		<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 			<div class="form-control">
-				<label class="label"><span class="label-text">客户编号</span></label>
+				<label class="label" for="customer-code"><span class="label-text">客户编号</span></label>
 				{#if editingId}
 					<input
+						id="customer-code"
 						type="text"
 						bind:value={form.customer_code}
 						class="input input-bordered bg-base-200/50 w-full"
@@ -179,6 +180,7 @@
 					/>
 				{:else}
 					<input
+						id="customer-code"
 						type="text"
 						value="系统自动生成"
 						class="input input-bordered bg-base-200/50 w-full"
@@ -187,11 +189,12 @@
 				{/if}
 			</div>
 			<div class="form-control">
-				<label class="label"
+				<label class="label" for="customer-credit-code"
 					><span class="label-text flex items-center gap-2"><Landmark size={14} /> 信用代码</span
 					></label
 				>
 				<input
+					id="customer-credit-code"
 					type="text"
 					bind:value={form.credit_code}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -201,10 +204,11 @@
 		</div>
 
 		<div class="form-control">
-			<label class="label"
+			<label class="label" for="customer-name"
 				><span class="label-text flex items-center gap-2"><Users size={14} /> 客户名称</span></label
 			>
 			<input
+				id="customer-name"
 				type="text"
 				bind:value={form.customer_name}
 				class="input input-bordered bg-base-200/50 w-full"
@@ -214,10 +218,11 @@
 
 		<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 			<div class="form-control">
-				<label class="label"
+				<label class="label" for="customer-contact-person"
 					><span class="label-text flex items-center gap-2"><User size={14} /> 联系人</span></label
 				>
 				<input
+					id="customer-contact-person"
 					type="text"
 					bind:value={form.contact_person}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -225,11 +230,12 @@
 				/>
 			</div>
 			<div class="form-control">
-				<label class="label"
+				<label class="label" for="customer-contact-phone"
 					><span class="label-text flex items-center gap-2"><Phone size={14} /> 联系电话</span
 					></label
 				>
 				<input
+					id="customer-contact-phone"
 					type="text"
 					bind:value={form.contact_phone}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -239,8 +245,9 @@
 		</div>
 
 		<div class="form-control">
-			<label class="label"><span class="label-text">地址/备注</span></label>
+			<label class="label" for="customer-address"><span class="label-text">地址/备注</span></label>
 			<textarea
+				id="customer-address"
 				bind:value={form.address}
 				class="textarea textarea-bordered bg-base-200/50 h-28"
 				placeholder="详细地址或备注"
@@ -249,8 +256,12 @@
 
 		{#if editingId}
 			<div class="form-control">
-				<label class="label"><span class="label-text">状态</span></label>
-				<select bind:value={form.status} class="select select-bordered bg-base-200/50 w-full">
+				<label class="label" for="customer-status"><span class="label-text">状态</span></label>
+				<select
+					id="customer-status"
+					bind:value={form.status}
+					class="select select-bordered bg-base-200/50 w-full"
+				>
 					<option value="enabled">可用</option>
 					<option value="disabled">禁用</option>
 				</select>

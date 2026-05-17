@@ -70,14 +70,17 @@
 </script>
 
 {#if show}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
 		class="fixed inset-0 z-[60] flex items-center justify-center p-4"
 		in:fade={{ duration: 200 }}
 		out:fade={{ duration: 150 }}
 	>
-		<div class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onclick={close}></div>
+		<button
+			type="button"
+			class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm"
+			aria-label="关闭确认弹窗"
+			onclick={close}
+		></button>
 
 		<div
 			class="bg-base-100 border-base-300 relative w-full max-w-md rounded-2xl border border-l-4 shadow-2xl {config.borderAccent} overflow-hidden"

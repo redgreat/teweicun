@@ -63,7 +63,7 @@ func UpdateStockInItemSerialSelections(ctx context.Context, stockInItemID int64,
 		var serialCode string
 		if err := tx.QueryRow(ctx, `
 			SELECT sc.status, sc.serial_code
-			FROM sku_serial_code sc
+			FROM material_serial_code sc
 			WHERE sc.id = $1
 			  AND sc.material_id = $2
 			FOR UPDATE
@@ -79,7 +79,7 @@ func UpdateStockInItemSerialSelections(ctx context.Context, stockInItemID int64,
 		if err := tx.QueryRow(ctx, `
 			SELECT EXISTS(
 				SELECT 1
-				FROM sku_serial_trace tr
+				FROM material_serial_trace tr
 				INNER JOIN stock_out so ON so.id = tr.ref_doc_id AND so.deleted_at IS NULL
 				WHERE tr.serial_code_id = $1
 				  AND tr.action = 'stock_out'

@@ -7,7 +7,7 @@ import (
 	"github.com/redgreat/teweicun/pkg/database"
 )
 
-type SkuSerialCodeItem struct {
+type MaterialSerialCodeItem struct {
 	ID            int64     `json:"id"`
 	SerialCode    string    `json:"serial_code"`
 	MaterialID    int64     `json:"material_id"`
@@ -20,7 +20,7 @@ type SkuSerialCodeItem struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
-func QuerySerialCodesByStockInItem(ctx context.Context, stockInItemID int64) ([]SkuSerialCodeItem, error) {
+func QueryMaterialSerialCodesByStockInItem(ctx context.Context, stockInItemID int64) ([]MaterialSerialCodeItem, error) {
 	sql := `
 		SELECT sc.id, sc.serial_code, sc.material_id, sc.material_code,
 		       sc.material_name, sc.status,
@@ -33,7 +33,7 @@ func QuerySerialCodesByStockInItem(ctx context.Context, stockInItemID int64) ([]
 		       END,
 		       COALESCE(w.warehouse_name, ''), false AS selected,
 		       sc.created_at
-		FROM sku_serial_code sc
+		FROM material_serial_code sc
 		LEFT JOIN warehouse w ON w.id = sc.warehouse_id
 		WHERE sc.stock_in_item_id = $1
 		ORDER BY sc.serial_code ASC
@@ -44,9 +44,9 @@ func QuerySerialCodesByStockInItem(ctx context.Context, stockInItemID int64) ([]
 	}
 	defer rows.Close()
 
-	items := make([]SkuSerialCodeItem, 0)
+	items := make([]MaterialSerialCodeItem, 0)
 	for rows.Next() {
-		var item SkuSerialCodeItem
+		var item MaterialSerialCodeItem
 		err := rows.Scan(
 			&item.ID, &item.SerialCode, &item.MaterialID, &item.MaterialCode,
 			&item.MaterialName, &item.Status, &item.StatusLabel,
@@ -60,7 +60,7 @@ func QuerySerialCodesByStockInItem(ctx context.Context, stockInItemID int64) ([]
 	return items, nil
 }
 
-func QuerySerialCodesByStockOutItem(ctx context.Context, stockOutItemID int64) ([]SkuSerialCodeItem, error) {
+func QueryMaterialSerialCodesByStockOutItem(ctx context.Context, stockOutItemID int64) ([]MaterialSerialCodeItem, error) {
 	sql := `
 		WITH target AS (
 			SELECT soi.stock_out_id, soi.inventory_id, soi.material_id, so.status AS stock_out_status
@@ -83,7 +83,7 @@ func QuerySerialCodesByStockOutItem(ctx context.Context, stockOutItemID int64) (
 		FROM target t
 		INNER JOIN stock_out_item_serial_selection sel
 		        ON sel.stock_out_item_id = $1
-		INNER JOIN sku_serial_code sc ON sc.id = sel.serial_code_id
+		INNER JOIN material_serial_code sc ON sc.id = sel.serial_code_id
 		LEFT JOIN warehouse w ON w.id = sc.warehouse_id
 		WHERE t.stock_out_status <> 'confirmed'
 
@@ -102,11 +102,11 @@ func QuerySerialCodesByStockOutItem(ctx context.Context, stockOutItemID int64) (
 		       true AS selected,
 		       tr.created_at
 		FROM target t
-		INNER JOIN sku_serial_trace tr
+		INNER JOIN material_serial_trace tr
 		        ON tr.ref_doc_type = 'stock_out'
 		       AND tr.ref_doc_id = t.stock_out_id
 		       AND tr.action = 'stock_out'
-		INNER JOIN sku_serial_code sc ON sc.id = tr.serial_code_id
+		INNER JOIN material_serial_code sc ON sc.id = tr.serial_code_id
 		LEFT JOIN warehouse w ON w.id = sc.warehouse_id
 		WHERE t.stock_out_status = 'confirmed'
 		  AND sc.material_id = t.material_id
@@ -119,9 +119,9 @@ func QuerySerialCodesByStockOutItem(ctx context.Context, stockOutItemID int64) (
 	}
 	defer rows.Close()
 
-	items := make([]SkuSerialCodeItem, 0)
+	items := make([]MaterialSerialCodeItem, 0)
 	for rows.Next() {
-		var item SkuSerialCodeItem
+		var item MaterialSerialCodeItem
 		err := rows.Scan(
 			&item.ID, &item.SerialCode, &item.MaterialID, &item.MaterialCode,
 			&item.MaterialName, &item.Status, &item.StatusLabel,
@@ -135,7 +135,7 @@ func QuerySerialCodesByStockOutItem(ctx context.Context, stockOutItemID int64) (
 	return items, nil
 }
 
-func QueryAvailableSerialCodesByStockOutItem(ctx context.Context, stockOutItemID int64) ([]SkuSerialCodeItem, error) {
+func QueryAvailableMaterialSerialCodesByStockOutItem(ctx context.Context, stockOutItemID int64) ([]MaterialSerialCodeItem, error) {
 	sql := `
 		SELECT sc.id, sc.serial_code, sc.material_id, sc.material_code,
 		       sc.material_name, sc.status,
@@ -154,7 +154,7 @@ func QueryAvailableSerialCodesByStockOutItem(ctx context.Context, stockOutItemID
 		             AND self.serial_code_id = sc.id
 		       ) AS selected,
 		       sc.created_at
-		FROM sku_serial_code sc
+		FROM material_serial_code sc
 		INNER JOIN stock_out_item soi ON soi.id = $1 AND soi.inventory_id = sc.inventory_id
 		INNER JOIN stock_out so ON so.id = soi.stock_out_id AND so.deleted_at IS NULL
 		LEFT JOIN warehouse w ON w.id = sc.warehouse_id
@@ -186,9 +186,9 @@ func QueryAvailableSerialCodesByStockOutItem(ctx context.Context, stockOutItemID
 	}
 	defer rows.Close()
 
-	items := make([]SkuSerialCodeItem, 0)
+	items := make([]MaterialSerialCodeItem, 0)
 	for rows.Next() {
-		var item SkuSerialCodeItem
+		var item MaterialSerialCodeItem
 		err := rows.Scan(
 			&item.ID, &item.SerialCode, &item.MaterialID, &item.MaterialCode,
 			&item.MaterialName, &item.Status, &item.StatusLabel,
@@ -202,12 +202,12 @@ func QueryAvailableSerialCodesByStockOutItem(ctx context.Context, stockOutItemID
 	return items, nil
 }
 
-// QueryAvailableIssuedSerialCodesByStockInItem 退料入库备货：查询可用“已出库(issued)”编码
+// QueryAvailableIssuedMaterialSerialCodesByStockInItem 退料入库备货：查询可用“已出库(issued)”编码
 // 规则：
-// - sku_serial_code.status = 'issued'
+// - material_serial_code.status = 'issued'
 // - 编码必须来自“领料出库(consumption_order)”且出库单已完成
 // - 编码不能被其它“待入库/部分入库”的退料入库单占用（但允许当前 stock_in_item 已选中的编码返回）
-func QueryAvailableIssuedSerialCodesByStockInItem(ctx context.Context, stockInItemID int64) ([]SkuSerialCodeItem, error) {
+func QueryAvailableIssuedMaterialSerialCodesByStockInItem(ctx context.Context, stockInItemID int64) ([]MaterialSerialCodeItem, error) {
 	sql := `
 		WITH target AS (
 			SELECT sii.id AS stock_in_item_id, sii.stock_in_id, sii.material_id
@@ -222,7 +222,7 @@ func QueryAvailableIssuedSerialCodesByStockInItem(ctx context.Context, stockInIt
 		),
 		issue_time AS (
 			SELECT tr.serial_code_id, MAX(tr.created_at) AS issued_at
-			FROM sku_serial_trace tr
+			FROM material_serial_trace tr
 			INNER JOIN stock_out so ON so.id = tr.ref_doc_id AND so.deleted_at IS NULL
 			WHERE tr.action = 'stock_out'
 			  AND tr.ref_doc_type = 'stock_out'
@@ -248,13 +248,13 @@ func QueryAvailableIssuedSerialCodesByStockInItem(ctx context.Context, stockInIt
 		       ) AS selected,
 		       sc.created_at
 		FROM target t
-		INNER JOIN sku_serial_code sc ON sc.material_id = t.material_id
+		INNER JOIN material_serial_code sc ON sc.material_id = t.material_id
 		INNER JOIN issue_time it ON it.serial_code_id = sc.id
 		LEFT JOIN warehouse w ON w.id = sc.warehouse_id
 		WHERE sc.status = 'issued'
 		  AND EXISTS (
 			SELECT 1
-			FROM sku_serial_trace tr
+			FROM material_serial_trace tr
 			INNER JOIN stock_out so ON so.id = tr.ref_doc_id AND so.deleted_at IS NULL
 			WHERE tr.serial_code_id = sc.id
 			  AND tr.action = 'stock_out'
@@ -287,9 +287,9 @@ func QueryAvailableIssuedSerialCodesByStockInItem(ctx context.Context, stockInIt
 	}
 	defer rows.Close()
 
-	items := make([]SkuSerialCodeItem, 0)
+	items := make([]MaterialSerialCodeItem, 0)
 	for rows.Next() {
-		var item SkuSerialCodeItem
+		var item MaterialSerialCodeItem
 		if err := rows.Scan(
 			&item.ID, &item.SerialCode, &item.MaterialID, &item.MaterialCode,
 			&item.MaterialName, &item.Status, &item.StatusLabel,

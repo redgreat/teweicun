@@ -230,7 +230,15 @@
 								item.id
 									? 'border-l-4 border-l-violet-500 bg-violet-500/10'
 									: ''}"
+								role="button"
+								tabindex="0"
 								onclick={() => selectType(item)}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										selectType(item);
+									}
+								}}
 							>
 								<div class="flex items-center justify-between">
 									<div>
@@ -350,8 +358,9 @@
 >
 	<div class="space-y-4">
 		<div class="form-control">
-			<label class="label"><span class="label-text">类型编码</span></label>
+			<label class="label" for="dict-type-code"><span class="label-text">类型编码</span></label>
 			<input
+				id="dict-type-code"
 				type="text"
 				bind:value={typeForm.dict_type}
 				class="input input-bordered bg-base-200/50 w-full"
@@ -359,8 +368,9 @@
 			/>
 		</div>
 		<div class="form-control">
-			<label class="label"><span class="label-text">类型名称</span></label>
+			<label class="label" for="dict-type-name"><span class="label-text">类型名称</span></label>
 			<input
+				id="dict-type-name"
 				type="text"
 				bind:value={typeForm.dict_name}
 				class="input input-bordered bg-base-200/50 w-full"
@@ -368,8 +378,9 @@
 			/>
 		</div>
 		<div class="form-control">
-			<label class="label"><span class="label-text">备注</span></label>
+			<label class="label" for="dict-type-remark"><span class="label-text">备注</span></label>
 			<input
+				id="dict-type-remark"
 				type="text"
 				bind:value={typeForm.remark}
 				class="input input-bordered bg-base-200/50 w-full"
@@ -389,8 +400,9 @@
 	<div class="space-y-4">
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"><span class="label-text">显示标签</span></label>
+				<label class="label" for="dict-data-label"><span class="label-text">显示标签</span></label>
 				<input
+					id="dict-data-label"
 					type="text"
 					bind:value={dataForm.dict_label}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -398,8 +410,9 @@
 				/>
 			</div>
 			<div class="form-control">
-				<label class="label"><span class="label-text">数据值</span></label>
+				<label class="label" for="dict-data-value"><span class="label-text">数据值</span></label>
 				<input
+					id="dict-data-value"
 					type="text"
 					bind:value={dataForm.dict_value}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -409,8 +422,11 @@
 		</div>
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"><span class="label-text">排序号</span></label>
+				<label class="label" for="dict-data-sort-order"
+					><span class="label-text">排序号</span></label
+				>
 				<input
+					id="dict-data-sort-order"
 					type="number"
 					bind:value={dataForm.sort_order}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -418,8 +434,9 @@
 				/>
 			</div>
 			<div class="form-control">
-				<label class="label"><span class="label-text">备注</span></label>
+				<label class="label" for="dict-data-remark"><span class="label-text">备注</span></label>
 				<input
+					id="dict-data-remark"
 					type="text"
 					bind:value={dataForm.remark}
 					class="input input-bordered bg-base-200/50 w-full"

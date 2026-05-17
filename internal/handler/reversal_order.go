@@ -110,7 +110,16 @@ func UpdateReversalOrder(c *gin.Context) {
 		return
 	}
 
-	err = service.UpdateReversalOrderStatus(c.Request.Context(), id, "pending", userID)
+	username := c.GetString("username")
+	if username == "" {
+		username = "未知用户"
+	}
+
+	if len(req.Items) > 0 {
+		err = service.UpdateReversalOrder(c.Request.Context(), id, req, userID, username)
+	} else {
+		err = service.UpdateReversalOrderStatus(c.Request.Context(), id, "pending", userID)
+	}
 	if err != nil {
 		response.Error(c, errcode.NewAppError(errcode.ErrInternalServer.Code, err.Error(), errcode.ErrInternalServer.HTTPCode))
 		return

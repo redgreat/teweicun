@@ -11,6 +11,7 @@
 	import { ArrowLeft, Plus, Trash2, Package } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { todayDateInCn } from '$lib/datetime';
+	import { buildFloatingDropdownGridLayout, calcFloatingDropdownPlacement } from '$lib/dropdown';
 
 	function genProjectNo() {
 		const d = new Date();
@@ -83,6 +84,7 @@
 	let invDropdownLeft = $state(0);
 	let invDropdownWidth = $state(0);
 	let invDropdownListMaxHeight = $state(260);
+	let invDropdownGridTemplate = $state('260px 192px 192px');
 	let invDropdownRAF: number | null = null;
 	let invSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -109,40 +111,38 @@
 
 	function updateInvDropdownPosition() {
 		if (!invDropdownAnchor) return;
-		const rect = invDropdownAnchor.getBoundingClientRect();
-		const headerHeight = 44;
-		const maxListHeight = 320;
-		const spaceBelow = window.innerHeight - rect.bottom;
-		const spaceAbove = rect.top;
-		const openUp = spaceBelow < headerHeight + 160 && spaceAbove > spaceBelow;
-
-		const padding = 8;
-		const width = Math.max(rect.width, 360);
-		let left = rect.left;
-		if (left + width > window.innerWidth - padding) {
-			left = Math.max(padding, window.innerWidth - padding - width);
-		}
-		invDropdownWidth = width;
-		invDropdownLeft = left;
-
-		if (openUp) {
-			const available = Math.max(
-				120,
-				Math.min(maxListHeight, rect.top - padding - 8 - headerHeight)
-			);
-			invDropdownListMaxHeight = available;
-			invDropdownTop = Math.max(padding, rect.top - 8 - headerHeight - available);
-		} else {
-			const available = Math.max(
-				120,
-				Math.min(maxListHeight, window.innerHeight - padding - (rect.bottom + 8) - headerHeight)
-			);
-			invDropdownListMaxHeight = available;
-			invDropdownTop = Math.min(
-				window.innerHeight - padding - headerHeight - available,
-				rect.bottom + 8
-			);
-		}
+		const layout = buildFloatingDropdownGridLayout({
+			firstColumnTexts: availableInventory.map((inv) =>
+				String(inv.material_display_name || inv.material_name || inv.material_code || '—')
+			),
+			fixedColumnWidths: [192, 192],
+			minFirstColumnWidth: 300
+		});
+		const placement = calcFloatingDropdownPlacement({
+			anchor: invDropdownAnchor,
+			minWidth: Math.max(700, layout.preferredPanelWidth),
+			maxWidth: 1800,
+			maxListHeight: 320,
+			headerHeight: 44,
+			preferBelowMinSpace: 204,
+			extraWidth: 140,
+			contentTexts: availableInventory.map((inv) =>
+				[
+					String(inv.material_display_name || inv.material_name || inv.material_code || '—'),
+					String(inv.material_code || '-'),
+					String(inv.warehouse_name || '-'),
+					`在库 ${inv.quantity ?? 0}`,
+					`可用 ${inv.available_quantity ?? 0} ${inv.unit || ''}`
+				].join('    ')
+			)
+		});
+		const resolvedWidth = Math.max(placement.width, layout.preferredPanelWidth);
+		const viewportWidth = typeof window === 'undefined' ? resolvedWidth : window.innerWidth;
+		invDropdownWidth = resolvedWidth;
+		invDropdownLeft = Math.max(8, Math.min(placement.left, viewportWidth - resolvedWidth - 8));
+		invDropdownTop = placement.top;
+		invDropdownListMaxHeight = placement.listMaxHeight;
+		invDropdownGridTemplate = layout.gridTemplate;
 	}
 
 	function startInvDropdownRAF() {
@@ -199,7 +199,7 @@
 			invOptionsHasMore = newItems.length >= 30;
 		} catch (err) {
 			console.error(err);
-			toast.error('加载有库存的物料失败');
+			toast.error('加载在库物料失败');
 		} finally {
 			invOptionsLoading = false;
 		}
@@ -301,7 +301,7 @@
 		for (let i = 0; i < form.items.length; i++) {
 			const item = form.items[i];
 			if (!item.inventory_id) {
-				toast.error(`第${i + 1}行：请选择物料 / 库存批次`);
+				toast.error(`第${i + 1}行：请选择在库物料`);
 				return;
 			}
 			if (!item.quantity || item.quantity <= 0) {
@@ -478,7 +478,7 @@
 														openInvDropdown(index, e.currentTarget as HTMLInputElement)}
 													oninput={() => onInvInput(index)}
 													class="input input-bordered bg-base-200/50 h-10 w-full text-base"
-													placeholder="搜索物料 / 仓库…"
+													placeholder="搜索在库物料名称、编码或仓库…"
 												/>
 											</div>
 										</td>
@@ -568,7 +568,7 @@
 		<div
 			class="text-base-content/50 border-base-200 flex items-center justify-between border-b px-3 py-2 text-xs"
 		>
-			<span>可选库存</span>
+			<span>可选在库物料</span>
 			<button type="button" class="btn btn-xs btn-ghost" onclick={closeInvDropdown}>关闭</button>
 		</div>
 		<div
@@ -576,10 +576,22 @@
 			style="max-height: {invDropdownListMaxHeight}px"
 			onscroll={onInvOptionsScroll}
 		>
+			<div
+				class="bg-base-200/80 border-base-200 sticky top-0 z-10 border-b px-3 py-2 backdrop-blur-sm"
+			>
+				<div
+					class="grid w-full gap-3 text-[11px] font-medium"
+					style:grid-template-columns={invDropdownGridTemplate}
+				>
+					<div>物料</div>
+					<div>仓库</div>
+					<div>库存</div>
+				</div>
+			</div>
 			{#if invOptionsLoading && invOptionsPage === 1}
 				<div class="text-base-content/50 p-4 text-center">正在加载...</div>
 			{:else if availableInventory.length === 0}
-				<div class="text-base-content/50 p-4 text-center">暂无可用库存</div>
+				<div class="text-base-content/50 p-4 text-center">暂无可用在库物料</div>
 			{:else}
 				{#each availableInventory as inv}
 					<button
@@ -587,16 +599,31 @@
 						class="hover:bg-base-200/60 border-base-200 w-full cursor-pointer border-b px-3 py-2.5 text-left last:border-b-0"
 						onclick={() => selectInventory(invDropdownOpenRow as number, inv)}
 					>
-						<div class="text-sm font-medium">
-							{inv.material_display_name || inv.material_name || inv.material_code || '—'}
-						</div>
-						<div class="text-base-content/70 mt-0.5 text-xs">
-							{inv.material_code}
-							{inv.material_display_name || inv.material_name}
-						</div>
-						<div class="text-base-content/50 mt-0.5 flex flex-wrap gap-x-2 text-xs">
-							<span>{inv.warehouse_name}</span>
-							<span>可用 {inv.available_quantity} {inv.unit}</span>
+						<div
+							class="grid w-full items-center gap-3"
+							style:grid-template-columns={invDropdownGridTemplate}
+						>
+							<div class="min-w-0">
+								<div class="text-sm font-medium whitespace-nowrap">
+									{inv.material_display_name || inv.material_name || inv.material_code || '—'}
+								</div>
+								<div class="text-base-content/60 font-mono text-[11px] whitespace-nowrap">
+									{inv.material_code || '-'}
+								</div>
+							</div>
+							<div>
+								<div class="text-xs whitespace-nowrap">{inv.warehouse_name || '-'}</div>
+								<div class="text-base-content/60 text-[11px] whitespace-nowrap">
+									单位 {inv.unit || '-'}
+								</div>
+							</div>
+							<div class="text-left md:text-right">
+								<div class="text-xs whitespace-nowrap">在库 {inv.quantity ?? 0}</div>
+								<div class="text-[11px] whitespace-nowrap text-emerald-500">
+									可用 {inv.available_quantity ?? 0}
+									{inv.unit || ''}
+								</div>
+							</div>
 						</div>
 					</button>
 				{/each}

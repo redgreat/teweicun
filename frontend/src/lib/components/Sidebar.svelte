@@ -13,9 +13,11 @@
 		TrendingUp,
 		ChevronLeft,
 		ClipboardCheck,
-		History
+		History,
+		BadgeDollarSign,
+		ReceiptText
 	} from 'lucide-svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 
 	let collapsed = $state(false);
 	const currentYear = new Date().getFullYear();
@@ -28,6 +30,14 @@
 			children: [
 				{ name: '采购订货', path: '/purchase/orders' },
 				{ name: '采购退货', path: '/purchase/return' }
+			]
+		},
+		{
+			name: '销售管理',
+			icon: BadgeDollarSign,
+			children: [
+				{ name: '销售订单', path: '/sales/orders' },
+				{ name: '销售退货单', path: '/sales/returns' }
 			]
 		},
 		{
@@ -44,6 +54,14 @@
 			children: [
 				{ name: '入库管理', path: '/stock/in' },
 				{ name: '出库管理', path: '/stock/out' }
+			]
+		},
+		{
+			name: '对账管理',
+			icon: ReceiptText,
+			children: [
+				{ name: '采购对账', path: '/reconciliation/purchase' },
+				{ name: '销售对账', path: '/reconciliation/sales' }
 			]
 		},
 		{ name: '库存台账', icon: ClipboardCheck, path: '/inventory/stock' },
@@ -66,7 +84,7 @@
 	];
 
 	function isActive(path: string) {
-		return $page.url.pathname === path;
+		return page.url.pathname === path || page.url.pathname.startsWith(path + '/');
 	}
 </script>
 

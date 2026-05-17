@@ -41,15 +41,3 @@ func ListInventoryMaterialLedgerSerials(ctx context.Context, q *request.Inventor
 func ExportInventoryMaterialLedger(ctx context.Context, q *request.InventoryMaterialLedgerQuery) ([]response.InventoryMaterialLedgerResp, *response.InventoryMaterialLedgerStatsResp, error) {
 	return db.ExportInventoryMaterialLedger(ctx, q)
 }
-
-func ListInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, int64, *response.InventorySKULedgerStatsResp, error) {
-	return db.ListInventorySKULedger(ctx, q)
-}
-
-func ListInventorySKUSerials(ctx context.Context, q *request.InventorySKUSerialQuery) ([]response.InventorySKUSerialResp, error) {
-	return db.ListInventorySKUSerials(ctx, q)
-}
-
-func ExportInventorySKULedger(ctx context.Context, q *request.InventorySKULedgerQuery) ([]response.InventorySKULedgerResp, *response.InventorySKULedgerStatsResp, error) {
-	return db.ExportInventorySKULedger(ctx, q)
-}

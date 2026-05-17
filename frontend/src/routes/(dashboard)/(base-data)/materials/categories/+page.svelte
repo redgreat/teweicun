@@ -266,9 +266,12 @@
 	<div class="space-y-4">
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"><span class="label-text">分类编码</span></label>
+				<label class="label" for="material-category-code"
+					><span class="label-text">分类编码</span></label
+				>
 				{#if editingId}
 					<input
+						id="material-category-code"
 						type="text"
 						bind:value={form.category_code}
 						class="input input-bordered bg-base-200/50 w-full"
@@ -276,6 +279,7 @@
 					/>
 				{:else}
 					<input
+						id="material-category-code"
 						type="text"
 						value="系统自动生成"
 						class="input input-bordered bg-base-200/50 w-full"
@@ -284,8 +288,11 @@
 				{/if}
 			</div>
 			<div class="form-control">
-				<label class="label"><span class="label-text">分类名称</span></label>
+				<label class="label" for="material-category-name"
+					><span class="label-text">分类名称</span></label
+				>
 				<input
+					id="material-category-name"
 					type="text"
 					bind:value={form.category_name}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -296,9 +303,12 @@
 
 		<div class="grid grid-cols-2 gap-4">
 			<div class="form-control">
-				<label class="label"><span class="label-text">排序号</span></label>
+				<label class="label" for="material-category-sort-order"
+					><span class="label-text">排序号</span></label
+				>
 				{#if editingId}
 					<input
+						id="material-category-sort-order"
 						type="number"
 						bind:value={form.sort_order}
 						class="input input-bordered bg-base-200/50 w-full"
@@ -306,6 +316,7 @@
 					/>
 				{:else}
 					<input
+						id="material-category-sort-order"
 						type="text"
 						value="系统自动按同级最大值 + 1"
 						class="input input-bordered bg-base-200/50 w-full"
@@ -314,8 +325,11 @@
 				{/if}
 			</div>
 			<div class="form-control">
-				<label class="label"><span class="label-text">上级分类</span></label>
+				<label class="label" for="material-category-parent"
+					><span class="label-text">上级分类</span></label
+				>
 				<input
+					id="material-category-parent"
 					type="text"
 					value={form.parent_id === 0 ? '顶级分类' : `ID: ${form.parent_id}`}
 					class="input input-bordered bg-base-200/50 w-full"
@@ -326,8 +340,14 @@
 
 		{#if editingId}
 			<div class="form-control">
-				<label class="label"><span class="label-text">状态</span></label>
-				<select bind:value={form.status} class="select select-bordered bg-base-200/50 w-full">
+				<label class="label" for="material-category-status"
+					><span class="label-text">状态</span></label
+				>
+				<select
+					id="material-category-status"
+					bind:value={form.status}
+					class="select select-bordered bg-base-200/50 w-full"
+				>
 					<option value="enabled">可用</option>
 					<option value="disabled">禁用</option>
 				</select>

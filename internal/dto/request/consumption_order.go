@@ -37,9 +37,21 @@ type ConsumptionOrderItemCreate struct {
 }
 
 type ConsumptionOrderUpdate struct {
-	ProjectNo   string `json:"project_no" binding:"max=50"`
-	ProductName string `json:"product_name" binding:"max=200"`
-	Remark      string `json:"remark"`
+	ProjectNo   string                       `json:"project_no" binding:"max=50"`
+	ProductName string                       `json:"product_name" binding:"max=200"`
+	OrderDate   string                       `json:"order_date" binding:"max=10"`
+	DesignerID  int64                        `json:"designer_id" binding:"omitempty,min=1"`
+	DesignerName string                      `json:"designer_name" binding:"omitempty,max=50"`
+	Remark      string                       `json:"remark"`
+	Items       []ConsumptionOrderItemUpdate `json:"items" binding:"required,min=1,dive"`
+}
+
+type ConsumptionOrderItemUpdate struct {
+	MaterialID  int64   `json:"material_id" binding:"required,min=1"`
+	InventoryID int64   `json:"inventory_id" binding:"required,min=1"`
+	Quantity    float64 `json:"quantity" binding:"required,gt=0"`
+	Unit        string  `json:"unit" binding:"required,max=20"`
+	Remark      string  `json:"remark" binding:"max=500"`
 }
 
 type ConsumptionOrderConfirm struct {

@@ -140,9 +140,6 @@ func QueryDashboardBigscreen(ctx context.Context, rangeKey string) (*response.Da
 			poi.material_id,
 			COALESCE(m.material_code, ''),
 			COALESCE(m.material_name, ''),
-			0::bigint AS sku_id,
-			''::varchar AS sku_code,
-			''::varchar AS sku_name,
 			COALESCE(SUM(poi.quantity), 0)::float8,
 			COALESCE(SUM(COALESCE(poi.amount, poi.quantity * poi.unit_price)), 0)::float8
 		FROM purchase_order po
@@ -164,9 +161,6 @@ func QueryDashboardBigscreen(ctx context.Context, rangeKey string) (*response.Da
 			coi.material_id,
 			COALESCE(m.material_code, ''),
 			COALESCE(m.material_name, ''),
-			0::bigint AS sku_id,
-			''::varchar AS sku_code,
-			''::varchar AS sku_name,
 			COALESCE(SUM(coi.quantity), 0)::float8,
 			COALESCE(SUM(coi.quantity * COALESCE(inv.unit_cost, 0)), 0)::float8
 		FROM consumption_order co
@@ -189,9 +183,6 @@ func QueryDashboardBigscreen(ctx context.Context, rangeKey string) (*response.Da
 			coi.material_id,
 			COALESCE(m.material_code, ''),
 			COALESCE(m.material_name, ''),
-			0::bigint AS sku_id,
-			''::varchar AS sku_code,
-			''::varchar AS sku_name,
 			COALESCE(SUM(coi.quantity), 0)::float8,
 			COALESCE(SUM(coi.quantity * COALESCE(inv.unit_cost, 0)), 0)::float8
 		FROM consumption_order co
@@ -235,7 +226,7 @@ func QueryDashboardBigscreen(ctx context.Context, rangeKey string) (*response.Da
 			  AND co.status IN ('confirmed', 'completed')
 			  AND co.order_date::date >= $1::date
 		),
-		active_sku AS (
+		active_serial AS (
 			SELECT 0::int8 AS cnt
 		),
 		max_single AS (
@@ -254,14 +245,14 @@ func QueryDashboardBigscreen(ctx context.Context, rangeKey string) (*response.Da
 		SELECT
 			(p.amount - c.amount) AS purchase_minus_consumption_amount,
 			active_material.cnt,
-			active_sku.cnt,
+			active_serial.cnt,
 			max_single.amount
-		FROM p, c, active_material, active_sku, max_single
+		FROM p, c, active_material, active_serial, max_single
 	`
 	if err := database.Pool.QueryRow(ctx, summarySQL, startDate).Scan(
 		&out.Summary.PurchaseMinusConsumptionAmount,
 		&out.Summary.ActiveMaterialCount,
-		&out.Summary.ActiveSKUCount,
+		&out.Summary.ActiveSerialCount,
 		&out.Summary.MaxSingleConsumptionAmount,
 	); err != nil {
 		return nil, err
@@ -282,7 +273,6 @@ func queryDashboardTopItems(ctx context.Context, query string, startDate time.Ti
 		var item response.DashboardTopItem
 		if err := rows.Scan(
 			&item.MaterialID, &item.MaterialCode, &item.MaterialName,
-			&item.SKUID, &item.SKUCode, &item.SKUName,
 			&item.Quantity, &item.Amount,
 		); err != nil {
 			return nil, err

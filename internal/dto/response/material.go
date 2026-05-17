@@ -25,7 +25,6 @@ type MaterialResp struct {
 	SafetyStock          float64               `json:"safety_stock"`
 	MaxStock             float64               `json:"max_stock"`
 	IsCode               bool                  `json:"is_code"`
-	SkuManaged           bool                  `json:"sku_managed"`
 	CustomAttributes     []CustomAttributeItem `json:"custom_attributes"`
 	DefaultWarehouseID   database.NullString   `json:"default_warehouse_id"`
 	DefaultWarehouseName database.NullString   `json:"default_warehouse_name"`
@@ -34,7 +33,6 @@ type MaterialResp struct {
 	Remark               database.NullString   `json:"remark"`
 	CreatedAt            time.Time             `json:"created_at"`
 	UpdatedAt            time.Time             `json:"updated_at"`
-	SkuCount             int64                 `json:"sku_count"`
 }
 
 type CustomAttributeItem struct {

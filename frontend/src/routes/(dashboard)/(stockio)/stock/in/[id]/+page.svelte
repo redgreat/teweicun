@@ -2,7 +2,7 @@
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import {
 		ArrowLeft,
 		FileText,
@@ -26,7 +26,7 @@
 	let serialModal = $state({ show: false, items: [] as any[], loading: false, title: '' });
 	let confirmLogModal = $state({ show: false, loading: false, items: [] as any[] });
 
-	const confirmMode = $derived($page.url.searchParams.get('mode') === 'confirm');
+	const confirmMode = $derived(page.url.searchParams.get('mode') === 'confirm');
 	const canConfirmReversal = $derived(
 		confirmMode && detail?.stock_in_type === 'reversal' && detail?.stock_in_status !== 'passed'
 	);
@@ -66,7 +66,7 @@
 		const next: Record<number, number[]> = {};
 		for (const item of codedItems()) {
 			try {
-				const codes: any = await api.get(`/sku-serial/stock-in-item/${item.id}/available-issued`);
+				const codes: any = await api.get(`/serial-codes/stock-in-item/${item.id}/available-issued`);
 				const codeList = Array.isArray(codes) ? codes : [];
 				next[item.id] = codeList.filter((c: any) => c.selected).map((c: any) => c.id);
 			} catch (e) {
@@ -88,7 +88,9 @@
 		pickerOpen = true;
 		pickerLoading = true;
 		try {
-			const options: any[] = await api.get(`/sku-serial/stock-in-item/${item.id}/available-issued`);
+			const options: any[] = await api.get(
+				`/serial-codes/stock-in-item/${item.id}/available-issued`
+			);
 			pickerOptions = options || [];
 			// 每次打开都以“后端已备货”为准重置本地选择，避免残留导致勾选异常
 			manualSelections[item.id] = (options || [])
@@ -299,7 +301,7 @@
 			items: []
 		};
 		try {
-			const res: any = await api.get(`/sku-serial/stock-in-item/${item.id}`);
+			const res: any = await api.get(`/serial-codes/stock-in-item/${item.id}`);
 			serialModal = { ...serialModal, loading: false, items: res || [] };
 		} catch (err: any) {
 			toast.error('加载编码详情失败: ' + (err?.message || err));
@@ -373,7 +375,7 @@
 	}
 
 	onMount(() => {
-		const id = Number($page.params.id);
+		const id = Number(page.params.id);
 		if (!id) {
 			toast.error('无效的入库单ID');
 			loading = false;

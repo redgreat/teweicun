@@ -110,7 +110,7 @@
 					<div class="text-base-content/55 flex items-center gap-1 text-sm">
 						<ClipboardList size={16} /> 物料名称
 					</div>
-					<div class="mt-1 break-words text-base font-semibold">
+					<div class="mt-1 text-base font-semibold break-words">
 						{text(material.material_display_name || material.material_name)}
 					</div>
 				</div>
@@ -121,8 +121,9 @@
 					</div>
 					<div class="mt-1">
 						<span
-							class="badge badge-lg {material.status === 'enabled' ? 'badge-success' : 'badge-error'}"
-							>{text(material.status_name || material.status)}</span
+							class="badge badge-lg {material.status === 'enabled'
+								? 'badge-success'
+								: 'badge-error'}">{text(material.status_name || material.status)}</span
 						>
 					</div>
 				</div>
@@ -209,28 +210,6 @@
 					</table>
 				</div>
 			{/if}
-		</div>
-
-		<div class="bg-base-100 border-base-300 space-y-4 rounded-2xl border p-5">
-			<div class="flex items-center justify-between gap-3">
-				<div class="text-lg font-semibold">使用提示</div>
-			</div>
-			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-				<div class="bg-base-200/40 border-base-300 rounded-xl border p-4">
-					<div class="text-base-content/55 text-sm">下单可见性</div>
-					<div class="mt-1 text-base">
-						{#if material.status === 'enabled'}
-							该物料当前可用于新建单据选料。
-						{:else}
-							该物料已停用，仅可在历史单据中查看。
-						{/if}
-					</div>
-				</div>
-				<div class="bg-base-200/40 border-base-300 rounded-xl border p-4">
-					<div class="text-base-content/55 text-sm">数据更新时间</div>
-					<div class="mt-1 text-base">{material.updated_at ? formatDate(material.updated_at) : '-'}</div>
-				</div>
-			</div>
 		</div>
 	{/if}
 </div>

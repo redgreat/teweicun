@@ -11,6 +11,7 @@
 	import { ArrowLeft, Plus, Trash2, RotateCcw } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { todayDateInCn } from '$lib/datetime';
+	import { buildFloatingDropdownGridLayout, calcFloatingDropdownPlacement } from '$lib/dropdown';
 
 	function genProjectNo() {
 		const d = new Date();
@@ -82,6 +83,7 @@
 	let invDropdownLeft = $state(0);
 	let invDropdownWidth = $state(0);
 	let invDropdownListMaxHeight = $state(260);
+	let invDropdownGridTemplate = $state('300px 192px 192px');
 	let invSearchTerm = $state('');
 	let invSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 	let invDropdownRAF: number | null = null;
@@ -107,40 +109,38 @@
 
 	function updateInvDropdownPosition() {
 		if (!invDropdownAnchor) return;
-		const rect = invDropdownAnchor.getBoundingClientRect();
-		const headerHeight = 44;
-		const maxListHeight = 320;
-		const spaceBelow = window.innerHeight - rect.bottom;
-		const spaceAbove = rect.top;
-		const openUp = spaceBelow < headerHeight + 160 && spaceAbove > spaceBelow;
-
-		const padding = 8;
-		const width = Math.max(rect.width, 520);
-		let left = rect.left;
-		if (left + width > window.innerWidth - padding) {
-			left = Math.max(padding, window.innerWidth - padding - width);
-		}
-		invDropdownWidth = width;
-		invDropdownLeft = left;
-
-		if (openUp) {
-			const available = Math.max(
-				120,
-				Math.min(maxListHeight, rect.top - padding - 8 - headerHeight)
-			);
-			invDropdownListMaxHeight = available;
-			invDropdownTop = Math.max(padding, rect.top - 8 - headerHeight - available);
-		} else {
-			const available = Math.max(
-				120,
-				Math.min(maxListHeight, window.innerHeight - padding - (rect.bottom + 8) - headerHeight)
-			);
-			invDropdownListMaxHeight = available;
-			invDropdownTop = Math.min(
-				window.innerHeight - padding - headerHeight - available,
-				rect.bottom + 8
-			);
-		}
+		const layout = buildFloatingDropdownGridLayout({
+			firstColumnTexts: invOptions.map((inv) =>
+				String(inv.material_display_name || inv.material_name || inv.material_code || '-')
+			),
+			fixedColumnWidths: [192, 192],
+			minFirstColumnWidth: 300
+		});
+		const placement = calcFloatingDropdownPlacement({
+			anchor: invDropdownAnchor,
+			minWidth: Math.max(760, layout.preferredPanelWidth),
+			maxWidth: 1800,
+			maxListHeight: 320,
+			headerHeight: 44,
+			preferBelowMinSpace: 204,
+			extraWidth: 150,
+			contentTexts: invOptions.map((inv) =>
+				[
+					String(inv.material_display_name || inv.material_name || '-'),
+					String(inv.material_code || '-'),
+					String(inv.warehouse_name || inv.warehouse_code || '-'),
+					`可用 ${formatQty(inv.available_quantity ?? 0)}`,
+					`上限 ${formatQty(invRowCap(inv))}`
+				].join('    ')
+			)
+		});
+		const resolvedWidth = Math.max(placement.width, layout.preferredPanelWidth);
+		const viewportWidth = typeof window === 'undefined' ? resolvedWidth : window.innerWidth;
+		invDropdownWidth = resolvedWidth;
+		invDropdownLeft = Math.max(8, Math.min(placement.left, viewportWidth - resolvedWidth - 8));
+		invDropdownTop = placement.top;
+		invDropdownListMaxHeight = placement.listMaxHeight;
+		invDropdownGridTemplate = layout.gridTemplate;
 	}
 
 	function startInvDropdownRAF() {
@@ -193,7 +193,7 @@
 			invOptionsHasMore = invOptions.length < total && list.length > 0;
 		} catch (err) {
 			console.error(err);
-			toast.error('加载可用库存失败');
+			toast.error('加载可退物料失败');
 		} finally {
 			invOptionsLoading = false;
 		}
@@ -296,7 +296,7 @@
 		for (let i = 0; i < form.items.length; i++) {
 			const item = form.items[i];
 			if (!item.inventory_id) {
-				toast.error(`第 ${i + 1} 行：请选择在库批次（有编码 / 无编码均可）`);
+				toast.error(`第 ${i + 1} 行：请选择可退物料`);
 				return false;
 			}
 			const qty = Number(item.quantity);
@@ -447,8 +447,8 @@
 									<th class="w-10">#</th>
 									<th class="min-w-[360px] lg:min-w-[480px]">物料名称</th>
 									<th class="min-w-[140px]">退货仓库</th>
-									<th class="min-w-[88px] text-right">批次可用</th>
-									<th class="min-w-[88px] text-right">退料上限</th>
+									<th class="min-w-[88px] text-right">库存可用</th>
+									<th class="min-w-[88px] text-right">可退上限</th>
 									<th class="min-w-[132px]">退料数量</th>
 									<th class="min-w-[72px]">单位</th>
 									<th class="min-w-[104px] text-right">单价</th>
@@ -538,7 +538,7 @@
 			<div class="border-base-300 flex flex-wrap items-center justify-end gap-4 border-t pt-6">
 				{#if form.items.length > 0}
 					<div class="mr-auto text-base">
-						<span class="text-base-content/60">退货金额合计：</span>
+						<span class="text-base-content/60">退料金额合计：</span>
 						<span class="text-success font-mono text-lg font-semibold"
 							>¥{formatMoney(grandTotal())}</span
 						>
@@ -567,7 +567,7 @@
 		<div
 			class="text-base-content/50 border-base-200 flex items-center justify-between border-b px-3 py-2 text-xs"
 		>
-			<span>匹配 {invOptions.length} / {invOptionsTotal}</span>
+			<span>匹配可退物料 {invOptions.length} / {invOptionsTotal}</span>
 			<button type="button" class="btn btn-xs btn-ghost" onclick={closeInvDropdown}>关闭</button>
 		</div>
 		<div
@@ -575,10 +575,20 @@
 			style="max-height: {invDropdownListMaxHeight}px"
 			onscroll={onInvOptionsScroll}
 		>
-			{#if invOptions.length === 0 && !invOptionsLoading}
-				<div class="text-base-content/50 p-4 text-sm">
-					无匹配的已领料可退批次（有编码 / 无编码）
+			<div
+				class="bg-base-200/80 border-base-200 sticky top-0 z-10 border-b px-3 py-2 backdrop-blur-sm"
+			>
+				<div
+					class="grid w-full gap-3 text-[11px] font-medium"
+					style:grid-template-columns={invDropdownGridTemplate}
+				>
+					<div>物料</div>
+					<div>仓库</div>
+					<div>可退库存</div>
 				</div>
+			</div>
+			{#if invOptions.length === 0 && !invOptionsLoading}
+				<div class="text-base-content/50 p-4 text-sm">无匹配的已领料可退物料</div>
 			{:else}
 				{#each invOptions as invOpt}
 					<button
@@ -586,8 +596,35 @@
 						class="hover:bg-base-200/60 border-base-200 w-full border-b px-3 py-2.5 text-left last:border-b-0"
 						onclick={() => selectInv(invDropdownOpenRow as number, invOpt)}
 					>
-						<div class="text-sm font-medium">{invOpt.material_name || '-'}</div>
-						<div class="text-base-content/60 font-mono text-xs">{buildInvOptionLabel(invOpt)}</div>
+						<div
+							class="grid w-full items-center gap-3"
+							style:grid-template-columns={invDropdownGridTemplate}
+						>
+							<div class="min-w-0">
+								<div class="text-sm font-medium whitespace-nowrap">
+									{invOpt.material_display_name || invOpt.material_name || '-'}
+								</div>
+								<div class="text-base-content/60 font-mono text-[11px] whitespace-nowrap">
+									{invOpt.material_code || '-'}
+								</div>
+							</div>
+							<div>
+								<div class="text-xs whitespace-nowrap">
+									{invOpt.warehouse_name || invOpt.warehouse_code || '-'}
+								</div>
+								<div class="text-base-content/60 text-[11px] whitespace-nowrap">
+									{invOpt.is_code === false ? '无编码' : '有编码'} / 单位 {invOpt.unit || '-'}
+								</div>
+							</div>
+							<div class="text-left md:text-right">
+								<div class="text-xs whitespace-nowrap">
+									可用 {formatQty(invOpt.available_quantity ?? 0)}
+								</div>
+								<div class="text-[11px] whitespace-nowrap text-emerald-500">
+									上限 {formatQty(invRowCap(invOpt))}
+								</div>
+							</div>
+						</div>
 					</button>
 				{/each}
 			{/if}
