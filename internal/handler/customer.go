@@ -50,13 +50,13 @@ func CreateCustomer(c *gin.Context) {
 	usernameVal, _ := c.Get("username")
 	username := usernameVal.(string)
 
-	id, err := service.CreateCustomer(c.Request.Context(), &req, userID, username)
+	id, code, err := service.CreateCustomer(c.Request.Context(), &req, userID, username)
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
 
-	response.Success(c, gin.H{"id": id})
+	response.Success(c, gin.H{"id": id, "customer_code": code})
 }
 
 func UpdateCustomer(c *gin.Context) {
@@ -103,4 +103,18 @@ func DeleteCustomer(c *gin.Context) {
 	}
 
 	response.Success(c, nil)
+}
+
+func ListPartnerDropdown(c *gin.Context) {
+	var q request.PartnerDropdownQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
+		return
+	}
+	list, err := service.ListPartnerDropdown(c.Request.Context(), &q)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Success(c, list)
 }

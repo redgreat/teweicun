@@ -79,10 +79,10 @@ func ListWarehouses(ctx context.Context, q *request.WarehouseQuery) ([]response.
 }
 
 // CreateWarehouse 创建仓库
-func CreateWarehouse(ctx context.Context, req *request.CreateWarehouseReq, userID int64, username string) (int64, error) {
+func CreateWarehouse(ctx context.Context, req *request.CreateWarehouseReq, userID int64, username string) (int64, string, error) {
 	tx, err := database.Pool.Begin(ctx)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	defer tx.Rollback(ctx)
 
@@ -90,7 +90,7 @@ func CreateWarehouse(ctx context.Context, req *request.CreateWarehouseReq, userI
 	var warehouseCode string
 	err = tx.QueryRow(ctx, "SELECT fn_generate_base_code('W')").Scan(&warehouseCode)
 	if err != nil {
-		return 0, fmt.Errorf("生成仓库编码失败: %w", err)
+		return 0, "", fmt.Errorf("生成仓库编码失败: %w", err)
 	}
 
 	var id int64
@@ -102,17 +102,17 @@ func CreateWarehouse(ctx context.Context, req *request.CreateWarehouseReq, userI
 	err = tx.QueryRow(ctx, query,
 		warehouseCode, req.WarehouseName, req.WarehouseType, req.ManagerID).Scan(&id)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
 	// 审计日志
 	auditQuery := `CALL sp_write_audit_log($1, $2, $3, $4, $5, $6, $7)`
 	_, err = tx.Exec(ctx, auditQuery, userID, username, "CREATE", "WAREHOUSE", "warehouse", id, nil)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
-	return id, tx.Commit(ctx)
+	return id, warehouseCode, tx.Commit(ctx)
 }
 
 // UpdateWarehouse 更新仓库

@@ -1,5 +1,5 @@
 <!--
-功能：新建采购收款单
+功能：新建销售收款单
 创建时间：2026-05-17
 创建人：wangcw
 -->
@@ -7,14 +7,19 @@
 	import { goto } from '$app/navigation';
 	import { toast } from '$lib/store/toast';
 	import api from '$lib/api/client';
-	import { Plus, Trash2, Save, ChevronLeft } from 'lucide-svelte';
+	import { Plus, Trash2, Save, ChevronLeft, RefreshCcw } from 'lucide-svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import { onMount } from 'svelte';
 
 	let form = $state({
 		customer_id: 0,
 		statement_date: new Date().toISOString().split('T')[0],
+		bill_type: 'cash',
 		collection_amount: 0,
+		invoice_amount: 0,
+		actual_amount: 0,
+		discount_amount: 0,
+		advance_amount: 0,
 		settlement_method: 'bank_transfer',
 		settlement_account: '',
 		settlement_no: '',
@@ -26,37 +31,60 @@
 	let customerOptions = $state<any[]>([]);
 	let sourceOrders = $state<any[]>([]);
 	let showOrderModal = $state(false);
+	let sourceKeyword = $state('');
+	let actualTouched = $state(false);
 
-	async function loadSuppliers() {
+	const differenceAmount = $derived(
+		Number(form.collection_amount || 0) - Number(form.actual_amount || 0)
+	);
+
+	async function loadCustomers() {
 		const res: any = await api.get('/base/customers?page_size=100');
 		customerOptions = res.list || [];
 	}
 
 	async function loadSourceOrders() {
-		if (!form.customer_id) return;
-		const res: any = await api.get(`/sales/orders?customer_id=${form.customer_id}&page_size=100`);
-		// Filter orders that have unverified amounts
-		sourceOrders = (res.list || []).filter(
-			(o: any) => o.total_amount - (o.verified_amount || 0) > 0
-		);
+		if (!form.customer_id) {
+			sourceOrders = [];
+			return;
+		}
+		const params = new URLSearchParams();
+		params.set('customer_id', String(form.customer_id));
+		if (sourceKeyword) params.set('keyword', sourceKeyword);
+		const res: any = await api.get(`/fund/collection-sources?${params.toString()}`);
+		sourceOrders = Array.isArray(res) ? res : res.list || [];
 	}
 
-	function handleSupplierChange() {
+	function handleCustomerChange() {
 		form.items = [];
+		sourceKeyword = '';
+		actualTouched = false;
+		calculateTotal();
 		loadSourceOrders();
 	}
 
 	function selectOrder(order: any) {
-		const unverified = order.total_amount - (order.verified_amount || 0);
+		if (
+			form.items.some(
+				(item) =>
+					item.source_doc_type === order.source_doc_type &&
+					item.source_order_id === order.source_order_id
+			)
+		) {
+			toast.warning('该源单据已添加');
+			return;
+		}
+
 		form.items.push({
-			source_order_id: order.id,
-			source_order_no: order.order_no,
-			business_type: '销售出库',
+			source_doc_type: order.source_doc_type,
+			source_order_id: order.source_order_id,
+			source_order_no: order.source_order_no,
+			business_type: order.business_type,
 			order_date: order.order_date,
-			order_amount: order.total_amount,
-			verified_amount: order.verified_amount || 0,
-			unverified_amount: unverified,
-			current_verify_amount: unverified,
+			order_amount: Number(order.order_amount || 0),
+			verified_amount: Number(order.verified_amount || 0),
+			unverified_amount: Number(order.unverified_amount || 0),
+			current_verify_amount: Number(order.unverified_amount || 0),
 			custom_tax_amount: 0,
 			remark: ''
 		});
@@ -70,15 +98,38 @@
 	}
 
 	function calculateTotal() {
-		form.collection_amount = form.items.reduce(
+		const total = form.items.reduce(
 			(sum, item) => sum + Number(item.current_verify_amount || 0),
 			0
 		);
+		form.collection_amount = Number(total.toFixed(2));
+		if (!actualTouched) form.actual_amount = form.collection_amount;
+		if (form.bill_type === 'invoice' && !form.invoice_amount) form.invoice_amount = form.collection_amount;
+	}
+
+	function handleBillTypeChange() {
+		if (form.bill_type === 'offset') {
+			form.actual_amount = 0;
+			form.invoice_amount = 0;
+			form.settlement_method = 'offset';
+			actualTouched = true;
+			return;
+		}
+		actualTouched = false;
+		form.actual_amount = form.collection_amount;
+		if (form.bill_type === 'invoice') form.invoice_amount = form.collection_amount;
+	}
+
+	function formatMoney(value: number) {
+		return `¥${Number(value || 0).toFixed(2)}`;
 	}
 
 	async function submit() {
 		if (!form.customer_id) return toast.warning('请选择客户');
 		if (form.items.length === 0) return toast.warning('请添加对账单据');
+		if (form.items.some((item) => Number(item.current_verify_amount || 0) === 0)) {
+			return toast.warning('本次核销金额不能为 0');
+		}
 
 		submitting = true;
 		try {
@@ -93,7 +144,7 @@
 	}
 
 	onMount(() => {
-		loadSuppliers();
+		loadCustomers();
 	});
 </script>
 
@@ -103,7 +154,7 @@
 			<button class="btn btn-ghost btn-sm" onclick={() => goto('/reconciliation/sales')}
 				><ChevronLeft size={20} /> 返回</button
 			>
-			<h1 class="text-xl font-bold">新建采购收款单</h1>
+			<h1 class="text-xl font-bold">新建销售收款单</h1>
 		</div>
 		<button class="btn btn-primary btn-sm" onclick={submit} disabled={submitting}
 			><Save size={16} /> 保存并确认</button
@@ -117,11 +168,11 @@
 				<select
 					class="select select-bordered"
 					bind:value={form.customer_id}
-					onchange={handleSupplierChange}
+					onchange={handleCustomerChange}
 				>
 					<option value={0}>请选择</option>
-					{#each customerOptions as s}
-						<option value={s.id}>{s.customer_name}</option>
+					{#each customerOptions as c}
+						<option value={c.id}>{c.customer_name}</option>
 					{/each}
 				</select>
 			</div>
@@ -130,22 +181,72 @@
 				<input type="date" class="input input-bordered" bind:value={form.statement_date} />
 			</div>
 			<div class="form-control">
+				<label class="label"><span class="label-text">票款类型</span></label>
+				<select class="select select-bordered" bind:value={form.bill_type} onchange={handleBillTypeChange}>
+					<option value="cash">款项</option>
+					<option value="invoice">票据</option>
+					<option value="offset">抵充</option>
+				</select>
+			</div>
+			<div class="form-control">
 				<label class="label"><span class="label-text">结算方式</span></label>
 				<select class="select select-bordered" bind:value={form.settlement_method}>
 					<option value="bank_transfer">银行转账</option>
 					<option value="cash">现金</option>
+					<option value="bill">承兑/票据</option>
 					<option value="wechat">微信</option>
 					<option value="alipay">支付宝</option>
+					<option value="offset">抵充</option>
 				</select>
 			</div>
+		</div>
+
+		<div class="grid grid-cols-5 gap-4">
 			<div class="form-control">
-				<label class="label"><span class="label-text">收款金额</span></label>
+				<label class="label"><span class="label-text">销售/抵充金额</span></label>
+				<input class="input input-bordered font-mono" value={formatMoney(form.collection_amount)} readonly />
+			</div>
+			<div class="form-control">
+				<label class="label"><span class="label-text">票据金额</span></label>
+				<input type="number" class="input input-bordered" bind:value={form.invoice_amount} />
+			</div>
+			<div class="form-control">
+				<label class="label"><span class="label-text">实际收款金额</span></label>
 				<input
 					type="number"
-					class="input input-bordered text-success font-mono"
-					bind:value={form.collection_amount}
+					class="input input-bordered"
+					bind:value={form.actual_amount}
+					oninput={() => (actualTouched = true)}
+				/>
+			</div>
+			<div class="form-control">
+				<label class="label"><span class="label-text">客户承担费用</span></label>
+				<input type="number" class="input input-bordered" bind:value={form.discount_amount} />
+			</div>
+			<div class="form-control">
+				<label class="label"><span class="label-text">销售与实收差额</span></label>
+				<input
+					class="input input-bordered font-mono {Math.abs(differenceAmount) > 0.005
+						? 'text-warning'
+						: 'text-success'}"
+					value={formatMoney(differenceAmount)}
 					readonly
 				/>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-3 gap-4">
+			<div class="form-control">
+				<label class="label"><span class="label-text">收款账户</span></label>
+				<input class="input input-bordered" bind:value={form.settlement_account} />
+			</div>
+			<div class="form-control">
+				<label class="label"><span class="label-text">结算号</span></label>
+				<input class="input input-bordered" bind:value={form.settlement_no} />
+			</div>
+			<div class="form-control">
+				<label class="label"><span class="label-text">备注</span></label>
+				<input class="input input-bordered" bind:value={form.remark} />
 			</div>
 		</div>
 
@@ -155,7 +256,10 @@
 				<button
 					class="btn btn-outline btn-sm"
 					disabled={!form.customer_id}
-					onclick={() => (showOrderModal = true)}
+					onclick={() => {
+						loadSourceOrders();
+						showOrderModal = true;
+					}}
 				>
 					<Plus size={16} /> 添加源单据
 				</button>
@@ -167,36 +271,38 @@
 							<th>源单编号</th>
 							<th>业务类型</th>
 							<th>单据日期</th>
-							<th>单据金额</th>
-							<th>未核销金额</th>
+							<th class="text-right">单据金额</th>
+							<th class="text-right">已核销</th>
+							<th class="text-right">未核销</th>
 							<th>本次核销金额</th>
-							<th>自定义税额</th>
+							<th>费用/税额</th>
 							<th>操作</th>
 						</tr>
 					</thead>
 					<tbody>
 						{#each form.items as item, i}
 							<tr>
-								<td>{item.source_order_no}</td>
+								<td class="font-mono">{item.source_order_no}</td>
 								<td>{item.business_type}</td>
 								<td>{item.order_date}</td>
-								<td>{item.order_amount}</td>
-								<td>{item.unverified_amount}</td>
-								<td
-									><input
+								<td class="text-right font-mono">{formatMoney(item.order_amount)}</td>
+								<td class="text-right font-mono">{formatMoney(item.verified_amount)}</td>
+								<td class="text-right font-mono">{formatMoney(item.unverified_amount)}</td>
+								<td>
+									<input
 										type="number"
-										class="input input-bordered input-sm w-24"
+										class="input input-bordered input-sm w-28"
 										bind:value={item.current_verify_amount}
 										oninput={calculateTotal}
-									/></td
-								>
-								<td
-									><input
+									/>
+								</td>
+								<td>
+									<input
 										type="number"
 										class="input input-bordered input-sm w-24"
 										bind:value={item.custom_tax_amount}
-									/></td
-								>
+									/>
+								</td>
 								<td>
 									<button class="btn btn-ghost btn-xs text-error" onclick={() => removeItem(i)}
 										><Trash2 size={14} /></button
@@ -205,7 +311,7 @@
 							</tr>
 						{/each}
 						{#if form.items.length === 0}
-							<tr><td colspan="8" class="text-base-content/50 py-4 text-center">暂无单据</td></tr>
+							<tr><td colspan="9" class="text-base-content/50 py-4 text-center">暂无单据</td></tr>
 						{/if}
 					</tbody>
 				</table>
@@ -214,29 +320,51 @@
 	</div>
 </div>
 
-<Modal bind:show={showOrderModal} title="选择源单据" maxWidth="max-w-3xl">
+<Modal bind:show={showOrderModal} title="选择源单据" maxWidth="max-w-5xl">
+	<div class="mb-3 flex items-center gap-2">
+		<input
+			class="input input-bordered h-9 w-72"
+			placeholder="单号/业务类型"
+			bind:value={sourceKeyword}
+		/>
+		<button class="btn btn-sm" onclick={loadSourceOrders}><RefreshCcw size={14} /> 刷新</button>
+	</div>
 	<div class="max-h-[60vh] overflow-y-auto">
 		<table class="table-sm table">
-			<thead
-				><tr
-					><th>单号</th><th>日期</th><th>总金额</th><th>已核销</th><th>未核销</th><th>操作</th></tr
-				></thead
-			>
+			<thead>
+				<tr>
+					<th>单号</th>
+					<th>业务类型</th>
+					<th>日期</th>
+					<th class="text-right">单据金额</th>
+					<th class="text-right">已核销</th>
+					<th class="text-right">未核销</th>
+					<th>状态</th>
+					<th>操作</th>
+				</tr>
+			</thead>
 			<tbody>
 				{#each sourceOrders as order}
 					<tr>
-						<td>{order.order_no}</td>
+						<td class="font-mono">{order.source_order_no}</td>
+						<td>{order.business_type}</td>
 						<td>{order.order_date}</td>
-						<td>{order.total_amount}</td>
-						<td>{order.verified_amount || 0}</td>
-						<td class="text-error">{order.total_amount - (order.verified_amount || 0)}</td>
-						<td
-							><button class="btn btn-primary btn-xs" onclick={() => selectOrder(order)}
-								>选择</button
-							></td
-						>
+						<td class="text-right font-mono">{formatMoney(order.order_amount)}</td>
+						<td class="text-right font-mono">{formatMoney(order.verified_amount)}</td>
+						<td class="text-right font-mono">{formatMoney(order.unverified_amount)}</td>
+						<td>
+							<span class="badge badge-sm {order.unverified_amount < 0 ? 'badge-warning' : 'badge-info'}">
+								{order.unverified_amount < 0 ? '抵充' : '待收'}
+							</span>
+						</td>
+						<td>
+							<button class="btn btn-primary btn-xs" onclick={() => selectOrder(order)}>选择</button>
+						</td>
 					</tr>
 				{/each}
+				{#if sourceOrders.length === 0}
+					<tr><td colspan="8" class="text-base-content/50 py-4 text-center">暂无可核销单据</td></tr>
+				{/if}
 			</tbody>
 		</table>
 	</div>

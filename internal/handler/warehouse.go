@@ -50,13 +50,13 @@ func CreateWarehouse(c *gin.Context) {
 	usernameVal, _ := c.Get("username")
 	username := usernameVal.(string)
 
-	id, err := service.CreateWarehouse(c.Request.Context(), &req, userID, username)
+	id, code, err := service.CreateWarehouse(c.Request.Context(), &req, userID, username)
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
 
-	response.Success(c, gin.H{"id": id})
+	response.Success(c, gin.H{"id": id, "warehouse_code": code})
 }
 
 func UpdateWarehouse(c *gin.Context) {

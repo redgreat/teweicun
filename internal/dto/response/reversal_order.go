@@ -18,6 +18,10 @@ type ReversalOrderResp struct {
 	StockInID     int64                   `json:"stock_in_id"`
 	StockInNo     string                  `json:"stock_in_no"`
 	Remark        string                  `json:"remark"`
+	ProductionOrderID       int64  `json:"production_order_id"`
+	ProductionNo            string `json:"production_no"`
+	ProductionReturnOrderID int64  `json:"production_return_order_id"`
+	ProductionReturnNo      string `json:"production_return_no"`
 	CreatedAt     time.Time               `json:"created_at"`
 	UpdatedAt     time.Time               `json:"updated_at"`
 	Items         []ReversalOrderItemResp `json:"items"`

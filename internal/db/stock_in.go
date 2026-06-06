@@ -33,6 +33,9 @@ func ListStockIns(ctx context.Context, q *request.StockInQuery) ([]response.Stoc
 		argID++
 	}
 	if q.StockInType != "" {
+		if q.StockInType == "return" {
+			q.StockInType = "sales_return"
+		}
 		where = append(where, fmt.Sprintf("COALESCE(sbi.stock_in_type, 'purchase') = $%d", argID))
 		args = append(args, q.StockInType)
 		argID++
@@ -80,10 +83,11 @@ func ListStockIns(ctx context.Context, q *request.StockInQuery) ([]response.Stoc
 		       CASE
 		           WHEN sbi.purchase_order_id IS NOT NULL THEN 'purchase_order'
 		           WHEN ro.id IS NOT NULL THEN 'reversal_order'
+		           WHEN sro.id IS NOT NULL THEN 'sales_return'
 		           ELSE ''
 		       END AS business_doc_type,
-		       COALESCE(sbi.purchase_order_id, ro.id, 0) AS business_doc_id,
-		       COALESCE(po.order_no, ro.order_no, '') AS business_doc_no,
+		       COALESCE(sbi.purchase_order_id, ro.id, sro.id, 0) AS business_doc_id,
+		       COALESCE(po.order_no, ro.order_no, sro.return_no, '') AS business_doc_no,
 		       si.warehouse_code, si.warehouse_name,
 		       si.stock_in_date,
 		       si.supplier_code, si.supplier_name,
@@ -99,6 +103,7 @@ func ListStockIns(ctx context.Context, q *request.StockInQuery) ([]response.Stoc
 		       si.created_at
 		%s
 		LEFT JOIN reversal_order ro ON ro.stock_in_id = si.id AND ro.deleted_at IS NULL
+		LEFT JOIN return_order sro ON sro.stock_in_id = si.id AND sro.return_type = 'sales_return' AND sro.deleted_at IS NULL
 		LEFT JOIN purchase_order po ON po.id = sbi.purchase_order_id AND po.deleted_at IS NULL
 		WHERE %s
 		ORDER BY si.id DESC
@@ -138,10 +143,11 @@ func GetStockInByID(ctx context.Context, id int64) (*response.StockInDetailResp,
 		       CASE
 		           WHEN sbi.purchase_order_id IS NOT NULL THEN 'purchase_order'
 		           WHEN ro.id IS NOT NULL THEN 'reversal_order'
+		           WHEN sro.id IS NOT NULL THEN 'sales_return'
 		           ELSE ''
 		       END AS business_doc_type,
-		       COALESCE(sbi.purchase_order_id, ro.id, 0) AS business_doc_id,
-		       COALESCE(po.order_no, ro.order_no, '') AS business_doc_no,
+		       COALESCE(sbi.purchase_order_id, ro.id, sro.id, 0) AS business_doc_id,
+		       COALESCE(po.order_no, ro.order_no, sro.return_no, '') AS business_doc_no,
 		       si.warehouse_code, si.warehouse_name,
 		       si.stock_in_date,
 		       si.supplier_code, si.supplier_name,
@@ -158,6 +164,7 @@ func GetStockInByID(ctx context.Context, id int64) (*response.StockInDetailResp,
 		FROM v_stock_in_list si
 		LEFT JOIN stock_in sbi ON sbi.id = si.id
 		LEFT JOIN reversal_order ro ON ro.stock_in_id = si.id AND ro.deleted_at IS NULL
+		LEFT JOIN return_order sro ON sro.stock_in_id = si.id AND sro.return_type = 'sales_return' AND sro.deleted_at IS NULL
 		LEFT JOIN purchase_order po ON po.id = sbi.purchase_order_id AND po.deleted_at IS NULL
 		WHERE si.id = $1
 	`
@@ -324,10 +331,10 @@ func ConfirmReversalStockIn(ctx context.Context, stockInID, userID int64) error 
 	defer rows.Close()
 
 	type line struct {
-		ItemID    int64
+		ItemID     int64
 		MaterialID int64
-		Need      int64
-		IsCode    bool
+		Need       int64
+		IsCode     bool
 	}
 	lines := make([]line, 0)
 	for rows.Next() {

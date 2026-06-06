@@ -96,7 +96,7 @@
 	async function handleConfirm(row: any) {
 		try {
 			await api.post(`/returns/${row.id}/confirm`, {});
-			toast.success('销售退货已确认入库');
+			toast.success('销售退货已提交，已生成待入库单');
 			loadData(currentPage);
 		} catch (err: any) {
 			toast.error('确认失败: ' + (err?.message || err));
@@ -157,7 +157,8 @@
 				>
 					<option value="">状态</option>
 					<option value="draft">待提交</option>
-					<option value="confirmed">已完成</option>
+					<option value="confirmed">待入库</option>
+					<option value="completed">已完成</option>
 				</select>
 				<input
 					type="date"
@@ -202,7 +203,7 @@
 				</a>
 				{#if row.status === 'draft'}
 					<button type="button" class={dgRowBtnSuccess} onclick={() => handleConfirm(row)}>
-						<CheckCircle size={16} /> 确认
+						<CheckCircle size={16} /> 提交
 					</button>
 					<button type="button" class={dgRowBtnDanger} onclick={() => handleDelete(row)}>
 						<Trash2 size={16} /> 删除

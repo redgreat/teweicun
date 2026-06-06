@@ -10,7 +10,6 @@
 	import { FileText } from 'lucide-svelte';
 	import { dgRowBtn, dgToolbarBtn } from '$lib/dgButtonClasses';
 	import { goto } from '$app/navigation';
-	import { formatDateInCn } from '$lib/datetime';
 
 	let items = $state<any[]>([]);
 	let total = $state(0);
@@ -18,12 +17,17 @@
 	let currentPage = $state(1);
 	const pageSize = 10;
 	let filters = $state({ statement_no: '', supplier_id: '' });
+	let supplierOptions = $state<any[]>([]);
 
 	const columns = [
 		{ key: 'statement_no', label: '对账单号', class: 'font-mono text-primary' },
 		{ key: 'supplier_name', label: '供应商名称' },
 		{ key: 'statement_date', label: '单据日期' },
-		{ key: 'payment_amount', label: '付款金额', class: 'text-right font-mono text-success pr-6' },
+		{ key: 'bill_type', label: '票款类型' },
+		{ key: 'payment_amount', label: '应付/抵充', class: 'text-right font-mono pr-6' },
+		{ key: 'invoice_amount', label: '票据金额', class: 'text-right font-mono pr-6' },
+		{ key: 'actual_amount', label: '实际付款', class: 'text-right font-mono text-success pr-6' },
+		{ key: 'difference_amount', label: '差额', class: 'text-right font-mono pr-6' },
 		{ key: 'settlement_method', label: '结算方式' },
 		{ key: 'status', label: '状态' }
 	];
@@ -36,6 +40,7 @@
 			params.set('page', String(page));
 			params.set('page_size', String(pageSize));
 			if (filters.statement_no) params.set('statement_no', filters.statement_no);
+			if (filters.supplier_id) params.set('supplier_id', filters.supplier_id);
 			const res: any = await api.get(`/fund/payments?${params.toString()}`);
 			items = res.list || [];
 			total = res.total || 0;
@@ -57,8 +62,19 @@
 		goto('/reconciliation/purchase/create');
 	}
 
+	async function loadSuppliers() {
+		try {
+			const res: any = await api.get('/base/partners/dropdown?type=supplier&limit=1000&status=enabled');
+			supplierOptions = res || [];
+		} catch (err) {
+			console.error(err);
+			supplierOptions = [];
+		}
+	}
+
 	onMount(() => {
 		loadData(1);
+		loadSuppliers();
 	});
 </script>
 
@@ -85,13 +101,27 @@
 					placeholder="单号"
 					bind:value={filters.statement_no}
 				/>
+				<select class="select bg-base-200 h-10 w-56 rounded-lg" bind:value={filters.supplier_id}>
+					<option value="">供应商</option>
+					{#each supplierOptions as s}
+						<option value={String(s.id)}>{s.name}</option>
+					{/each}
+				</select>
 				<button type="button" class={dgToolbarBtn} onclick={handleSearch}>查询</button>
 				<button type="button" class={dgToolbarBtn} onclick={resetFilters}>重置</button>
 			</div>
 		{/snippet}
 		{#snippet cellRender(key, value, row)}
-			{#if key === 'payment_amount'}
-				<span class="text-success font-mono font-semibold">¥{(value || 0).toFixed(2)}</span>
+			{#if ['payment_amount', 'invoice_amount', 'actual_amount', 'difference_amount'].includes(key)}
+				<span
+					class="font-mono font-semibold {key === 'actual_amount'
+						? 'text-success'
+						: key === 'difference_amount' && Math.abs(value || 0) > 0.005
+							? 'text-warning'
+							: ''}">¥{(value || 0).toFixed(2)}</span
+				>
+			{:else if key === 'bill_type'}
+				{value === 'invoice' ? '票据' : value === 'offset' ? '抵充' : '款项'}
 			{:else if key === 'status'}
 				<span class="badge badge-md {value === 'completed' ? 'badge-success' : 'badge-ghost'}">
 					{value === 'completed' ? '已完成' : '草稿'}

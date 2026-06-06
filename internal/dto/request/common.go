@@ -15,3 +15,24 @@ type PageQuery struct {
 func (q *PageQuery) Offset() int {
 	return (q.Page - 1) * q.PageSize
 }
+
+type ReconciliationSummaryQuery struct {
+	PageQuery
+	StartDate  string `form:"start_date"`
+	EndDate    string `form:"end_date"`
+	Keyword    string `form:"keyword"`
+	CustomerID int64  `form:"customer_id"`
+	SupplierID int64  `form:"supplier_id"`
+}
+
+type ProfitReportQuery struct {
+	StartDate string `form:"start_date"`
+	EndDate   string `form:"end_date"`
+}
+
+type PartnerDropdownQuery struct {
+	Type    string `form:"type" binding:"required,oneof=customer supplier"`
+	Keyword string `form:"keyword"`
+	Status  string `form:"status"`
+	Limit   int    `form:"limit"`
+}

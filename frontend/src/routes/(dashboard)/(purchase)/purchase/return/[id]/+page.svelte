@@ -9,15 +9,7 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import {
-		ArrowLeft,
-		FileText,
-		Building2,
-		Calendar,
-		BadgeCheck,
-		Package,
-		ClipboardList
-	} from 'lucide-svelte';
+	import { ArrowLeft, FileText, Building2, Calendar, BadgeCheck, Package, ClipboardList, Printer } from 'lucide-svelte';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
 	let loading = $state(true);
@@ -104,7 +96,7 @@
 		</div>
 	</div>
 
-	<div class="flex flex-wrap items-center justify-between gap-3">
+	<div class="flex flex-wrap items-center justify-between gap-3 print:hidden">
 		<div class="flex flex-wrap items-center gap-2">
 			<a href="/purchase/return" class="btn btn-ghost gap-1 text-base">
 				<ArrowLeft size={18} /> 返回列表
@@ -117,6 +109,9 @@
 		</div>
 		{#if order}
 			<div class="flex flex-wrap items-center gap-2">
+				<button class="btn btn-outline btn-sm gap-1" onclick={() => window.print()}>
+					<Printer size={16} /> 打印
+				</button>
 				<span class="badge badge-lg {statusBadgeClass(order.status)}"
 					>{statusName(order.status)}</span
 				>

@@ -18,7 +18,7 @@ func ListWarehouses(ctx context.Context, q *request.WarehouseQuery) ([]response.
 	return db.ListWarehouses(ctx, q)
 }
 
-func CreateWarehouse(ctx context.Context, req *request.CreateWarehouseReq, userID int64, username string) (int64, error) {
+func CreateWarehouse(ctx context.Context, req *request.CreateWarehouseReq, userID int64, username string) (int64, string, error) {
 	return db.CreateWarehouse(ctx, req, userID, username)
 }
 

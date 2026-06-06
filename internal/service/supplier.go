@@ -18,7 +18,7 @@ func ListSuppliers(ctx context.Context, q *request.SupplierQuery) ([]response.Su
 	return db.ListSuppliers(ctx, q)
 }
 
-func CreateSupplier(ctx context.Context, req *request.CreateSupplierReq, userID int64, username string) (int64, error) {
+func CreateSupplier(ctx context.Context, req *request.CreateSupplierReq, userID int64, username string) (int64, string, error) {
 	return db.CreateSupplier(ctx, req, userID, username)
 }
 

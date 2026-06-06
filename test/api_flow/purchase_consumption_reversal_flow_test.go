@@ -25,6 +25,7 @@ type PermissionNode struct {
 }
 
 type Supplier struct {
+	ID           int64  `json:"id"`
 	SupplierCode string `json:"supplier_code"`
 	SupplierName string `json:"supplier_name"`
 }
@@ -617,7 +618,7 @@ func mustEnsureSupplier(ctx context.Context, t *testing.T, c *testutil.Client, p
 	}
 	req := map[string]any{
 		"supplier_code":  prefix + "_SUP",
-		"supplier_name":  "E2E Supplier " + prefix,
+		"supplier_name":  "测试供应商",
 		"supplier_type":  "manufacturer",
 		"contact_person": "E2E",
 		"contact_phone":  "13800000000",
@@ -662,7 +663,7 @@ func mustEnsureCategory(ctx context.Context, t *testing.T, c *testutil.Client, p
 	req := map[string]any{
 		"parent_id":     0,
 		"category_code": prefix + "_CAT",
-		"category_name": "E2E Category " + prefix,
+		"category_name": "测试分类",
 		"sort_order":    1,
 	}
 	var out testutil.IDResp

@@ -9,17 +9,7 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import {
-		ArrowLeft,
-		FileText,
-		Calendar,
-		User,
-		Truck,
-		CircleCheckBig,
-		Ban,
-		ClipboardList,
-		Pencil
-	} from 'lucide-svelte';
+	import { ArrowLeft, FileText, Calendar, User, Truck, CircleCheckBig, Ban, ClipboardList, Pencil, Printer } from 'lucide-svelte';
 	import { getStatusStyle } from '$lib/statusStyles';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
@@ -83,24 +73,6 @@
 		}
 	}
 
-	async function handleCreateStockOut() {
-		if (!detail?.id) return;
-		acting = true;
-		try {
-			const res: any = await api.post(`/sales/orders/${detail.id}/ship`, {});
-			const stockOutID = Number(res?.stock_out_id || 0);
-			if (!stockOutID) {
-				toast.error('未生成销售出库单');
-				return;
-			}
-			window.location.href = `/stock/out/${stockOutID}?mode=confirm`;
-		} catch (err: any) {
-			toast.error('生成销售出库单失败: ' + (err?.message || err));
-		} finally {
-			acting = false;
-		}
-	}
-
 	onMount(() => {
 		const id = Number(page.params.id);
 		if (!id) {
@@ -128,12 +100,15 @@
 		</div>
 	</div>
 
-	<div class="flex flex-wrap items-center justify-between gap-3">
+	<div class="flex flex-wrap items-center justify-between gap-3 print:hidden">
 		<a href="/sales/orders" class="btn btn-ghost btn-sm gap-1">
 			<ArrowLeft size={14} /> 返回列表
 		</a>
 		{#if detail}
 			<div class="flex flex-wrap items-center gap-2">
+				<button class="btn btn-outline btn-sm gap-1" onclick={() => window.print()}>
+					<Printer size={16} /> 打印
+				</button>
 				{#if detail.order_status === 'draft'}
 					<button
 						class="btn btn-sm btn-success text-white"

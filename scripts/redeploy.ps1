@@ -82,6 +82,37 @@ function Show-Usage {
 }
 
 function Get-ComposeRunner {
+  function Add-ToPathIfExists([string]$dir) {
+    if ([string]::IsNullOrWhiteSpace($dir)) { return }
+    if (-not (Test-Path -LiteralPath $dir)) { return }
+    $parts = @($env:PATH -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($parts -contains $dir) { return }
+    $env:PATH = ($dir + ';' + $env:PATH)
+  }
+
+  function Ensure-DockerOnPath {
+    if (Get-Command docker -ErrorAction SilentlyContinue) { return }
+
+    $dirs = @()
+    if ($env:ProgramFiles) {
+      $dirs += (Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin')
+      $dirs += (Join-Path $env:ProgramFiles 'Docker\Docker\resources')
+    }
+    if ($env:ProgramFiles -and ${env:ProgramFiles(x86)}) {
+      $dirs += (Join-Path ${env:ProgramFiles(x86)} 'Docker\Docker\resources\bin')
+      $dirs += (Join-Path ${env:ProgramFiles(x86)} 'Docker\Docker\resources')
+    }
+
+    foreach ($d in $dirs | Select-Object -Unique) {
+      if (Test-Path -LiteralPath (Join-Path $d 'docker.exe')) {
+        Add-ToPathIfExists $d
+        break
+      }
+    }
+  }
+
+  Ensure-DockerOnPath
+
   $docker = Get-Command docker -ErrorAction SilentlyContinue
   if ($docker) {
     try {
@@ -98,7 +129,13 @@ function Get-ComposeRunner {
     return @{ Cmd = 'docker-compose'; Prefix = @() }
   }
 
-  throw '未找到 docker compose / docker-compose。请先安装 Docker Desktop（包含 Compose）。'
+  throw @"
+未找到 docker compose / docker-compose。
+常见原因：
+1) Docker Desktop 已安装但当前终端未刷新 PATH（关闭并重新打开终端/IDE 即可）
+2) Docker Desktop 未启动（先启动 Docker Desktop，确保右下角 Docker 图标为 Running）
+3) docker.exe 不在 PATH（可临时把 C:\Program Files\Docker\Docker\resources\bin 加到 PATH）
+"@
 }
 
 function Invoke-Compose {

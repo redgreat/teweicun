@@ -51,6 +51,21 @@ func GetFundPayment(c *gin.Context) {
 	response.Success(c, order)
 }
 
+func ListFundPaymentSources(c *gin.Context) {
+	var q request.FundPaymentSourceQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
+		return
+	}
+
+	list, err := service.ListFundPaymentSources(c.Request.Context(), &q)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Success(c, list)
+}
+
 func CreateFundPayment(c *gin.Context) {
 	var req request.CreateFundPaymentReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -106,6 +121,21 @@ func GetFundCollection(c *gin.Context) {
 		return
 	}
 	response.Success(c, order)
+}
+
+func ListFundCollectionSources(c *gin.Context) {
+	var q request.FundCollectionSourceQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
+		return
+	}
+
+	list, err := service.ListFundCollectionSources(c.Request.Context(), &q)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Success(c, list)
 }
 
 func CreateFundCollection(c *gin.Context) {

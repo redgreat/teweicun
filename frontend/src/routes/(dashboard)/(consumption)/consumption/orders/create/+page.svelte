@@ -70,8 +70,18 @@
 		product_name: '',
 		order_date: todayDateInCn(),
 		remark: '',
+		produced_material_id: 0,
+		produced_warehouse_id: 0,
+		produced_quantity: 0,
+		production_order_id: 0,
+		production_return_order_id: 0,
 		items: [] as any[]
 	});
+
+	let producedMaterials = $state<any[]>([]);
+	let producedWarehouses = $state<any[]>([]);
+	let productionOrders = $state<any[]>([]);
+	let productionReturnOrders = $state<any[]>([]);
 
 	let availableInventory = $state<any[]>([]);
 	let invSearchTerm = $state('');
@@ -89,6 +99,38 @@
 	let invSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	let submitting = $state(false);
+
+	async function loadProducedOptions() {
+		try {
+			const mRes: any = await api.get('/base/materials?page=1&page_size=200');
+			producedMaterials = mRes?.list || [];
+		} catch (e) {
+			console.error(e);
+			toast.error('加载物料列表失败');
+		}
+
+		try {
+			const wRes: any = await api.get('/base/warehouses?page=1&page_size=200');
+			producedWarehouses = wRes?.list || [];
+		} catch (e) {
+			console.error(e);
+			toast.error('加载仓库列表失败');
+		}
+
+		try {
+			const poRes: any = await api.get('/production/orders/dropdown');
+			productionOrders = poRes || [];
+		} catch (e) {
+			console.error(e);
+		}
+
+		try {
+			const prRes: any = await api.get('/production/returns/dropdown');
+			productionReturnOrders = prRes || [];
+		} catch (e) {
+			console.error(e);
+		}
+	}
 
 	function newEmptyItem() {
 		return {
@@ -293,6 +335,16 @@
 			toast.error('领料日期不能早于今天');
 			return;
 		}
+		const hasProduced =
+			Number(form.produced_material_id || 0) > 0 ||
+			Number(form.produced_warehouse_id || 0) > 0 ||
+			Number(form.produced_quantity || 0) > 0;
+		if (hasProduced) {
+			if (!form.produced_material_id || !form.produced_warehouse_id || !(Number(form.produced_quantity) > 0)) {
+				toast.error('自动生产入库：请同时选择成品物料、成品仓库，并填写成品数量');
+				return;
+			}
+		}
 		if (form.items.length === 0) {
 			toast.error('请至少添加一条领料明细');
 			return;
@@ -323,11 +375,16 @@
 		submitting = true;
 		try {
 			const submitData = {
-				project_no: form.project_no.trim(),
-				product_name: form.product_name.trim(),
-				order_date: form.order_date,
-				remark: form.remark,
-				items: form.items.map((item) => ({
+			project_no: form.project_no.trim(),
+			product_name: form.product_name.trim(),
+			order_date: form.order_date,
+			remark: form.remark,
+			produced_material_id: hasProduced ? Number(form.produced_material_id) : undefined,
+			produced_warehouse_id: hasProduced ? Number(form.produced_warehouse_id) : undefined,
+			produced_quantity: hasProduced ? Number(form.produced_quantity) : undefined,
+			production_order_id: Number(form.production_order_id) || 0,
+			production_return_order_id: Number(form.production_return_order_id) || 0,
+			items: form.items.map((item) => ({
 					material_id: item.material_id,
 					inventory_id: item.inventory_id,
 					quantity: Number(item.quantity),
@@ -353,6 +410,7 @@
 		if (!form.project_no.trim()) {
 			form.project_no = genProjectNo();
 		}
+		loadProducedOptions();
 	});
 </script>
 
@@ -427,6 +485,104 @@
 							/>
 						</div>
 					</div>
+				</div>
+			</div>
+
+			<div class="divider">自动生产入库（可选）</div>
+
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+				<div class="form-control">
+					<label class="label" for="co-produced-mat">
+						<span class="label-text font-medium">成品物料</span>
+					</label>
+					<select
+						id="co-produced-mat"
+						class="select select-bordered bg-base-200/50 h-11 w-full text-base"
+						bind:value={form.produced_material_id}
+					>
+						<option value="0">不生成生产入库</option>
+						{#each producedMaterials as m}
+							<option value={m.id}>
+								{m.material_code ? `${m.material_code} ` : ''}{m.material_name}
+							</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="form-control">
+					<label class="label" for="co-produced-wh">
+						<span class="label-text font-medium">成品仓库</span>
+					</label>
+					<select
+						id="co-produced-wh"
+						class="select select-bordered bg-base-200/50 h-11 w-full text-base"
+						bind:value={form.produced_warehouse_id}
+					>
+						<option value="0">请选择</option>
+						{#each producedWarehouses as w}
+							<option value={w.id}>
+								{w.warehouse_code ? `${w.warehouse_code} ` : ''}{w.warehouse_name}
+							</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="form-control">
+					<label class="label" for="co-produced-qty">
+						<span class="label-text font-medium">成品数量</span>
+					</label>
+					<input
+						id="co-produced-qty"
+						type="number"
+						min="0"
+						step="0.001"
+						class="input input-bordered bg-base-200/50 h-11 w-full text-base"
+						bind:value={form.produced_quantity}
+						placeholder="例如 1"
+					/>
+				</div>
+			</div>
+
+			<div class="divider">关联生产单据（可选）</div>
+
+			<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+				<div class="form-control">
+					<label class="label" for="co-prod-order">
+						<span class="label-text font-medium">关联生产单</span>
+					</label>
+					<select
+						id="co-prod-order"
+						class="select select-bordered bg-base-200/50 h-11 w-full text-base"
+						bind:value={form.production_order_id}
+					>
+						<option value="0">不关联（提交后自动生成新的）</option>
+						{#each productionOrders as po}
+							<option value={po.id}>
+								{po.production_no}{po.material_name ? ` | ${po.material_name}` : ''}
+							</option>
+						{/each}
+					</select>
+					<label class="label py-0 pt-0.5">
+						<span class="label-text-alt text-base-content/50">多个领料单可关联同一生产单，系统自动计算成本汇总</span>
+					</label>
+				</div>
+
+				<div class="form-control">
+					<label class="label" for="co-prod-return">
+						<span class="label-text font-medium">关联生产退货单</span>
+					</label>
+					<select
+						id="co-prod-return"
+						class="select select-bordered bg-base-200/50 h-11 w-full text-base"
+						bind:value={form.production_return_order_id}
+					>
+						<option value="0">不关联</option>
+						{#each productionReturnOrders as pr}
+							<option value={pr.id}>
+								{pr.return_no}{pr.material_name ? ` | ${pr.material_name}` : ''}
+							</option>
+						{/each}
+					</select>
 				</div>
 			</div>
 

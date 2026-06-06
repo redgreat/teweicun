@@ -25,6 +25,11 @@ type ConsumptionOrderCreate struct {
 	DesignerID    int64                        `json:"designer_id" binding:"omitempty,min=1"`    // 由 Handler 注入
 	DesignerName  string                       `json:"designer_name" binding:"omitempty,max=50"` // 由 Handler 注入
 	Remark        string                       `json:"remark"`
+	ProducedMaterialID        int64   `json:"produced_material_id" binding:"omitempty,min=1"`
+	ProducedQuantity          float64 `json:"produced_quantity" binding:"omitempty,gt=0"`
+	ProducedWarehouseID       int64   `json:"produced_warehouse_id" binding:"omitempty,min=1"`
+	ProductionOrderID         int64   `json:"production_order_id"`         // 关联已有生产单（可选）
+	ProductionReturnOrderID   int64   `json:"production_return_order_id"`  // 关联已有生产退货单（可选）
 	Items         []ConsumptionOrderItemCreate `json:"items" binding:"required,min=1,dive"`
 }
 
@@ -43,6 +48,9 @@ type ConsumptionOrderUpdate struct {
 	DesignerID  int64                        `json:"designer_id" binding:"omitempty,min=1"`
 	DesignerName string                      `json:"designer_name" binding:"omitempty,max=50"`
 	Remark      string                       `json:"remark"`
+	ProducedMaterialID  int64   `json:"produced_material_id" binding:"omitempty,min=1"`
+	ProducedQuantity    float64 `json:"produced_quantity" binding:"omitempty,gt=0"`
+	ProducedWarehouseID int64   `json:"produced_warehouse_id" binding:"omitempty,min=1"`
 	Items       []ConsumptionOrderItemUpdate `json:"items" binding:"required,min=1,dive"`
 }
 

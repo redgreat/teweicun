@@ -16,6 +16,10 @@ func GetFundPayment(ctx context.Context, id int64) (*response.FundPaymentDetailR
 	return db.GetFundPayment(ctx, id)
 }
 
+func ListFundPaymentSources(ctx context.Context, q *request.FundPaymentSourceQuery) ([]response.FundPaymentSourceResp, error) {
+	return db.ListFundPaymentSources(ctx, q)
+}
+
 func CreateFundPayment(ctx context.Context, req *request.CreateFundPaymentReq, userID int64, username string) (int64, error) {
 	return db.CreateFundPayment(ctx, req, userID, username)
 }
@@ -26,6 +30,10 @@ func ListFundCollections(ctx context.Context, q *request.FundCollectionQuery) ([
 
 func GetFundCollection(ctx context.Context, id int64) (*response.FundCollectionDetailResp, error) {
 	return db.GetFundCollection(ctx, id)
+}
+
+func ListFundCollectionSources(ctx context.Context, q *request.FundCollectionSourceQuery) ([]response.FundCollectionSourceResp, error) {
+	return db.ListFundCollectionSources(ctx, q)
 }
 
 func CreateFundCollection(ctx context.Context, req *request.CreateFundCollectionReq, userID int64, username string) (int64, error) {

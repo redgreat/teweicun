@@ -28,6 +28,7 @@
 
 	let suppliers = $state<any[]>([]);
 	let warehouses = $state<any[]>([]);
+	let stockInTypes = $state<any[]>([]);
 	let filters = $state({
 		stock_in_no: '',
 		stock_in_type: '',
@@ -119,6 +120,16 @@
 			warehouses = res.list || [];
 		} catch (err) {
 			console.error(err);
+		}
+	}
+
+	async function loadStockInTypes() {
+		try {
+			const res: any = await api.get('/system/dict/stock_in_type/data');
+			stockInTypes = Array.isArray(res) ? res : [];
+		} catch (err) {
+			console.error(err);
+			stockInTypes = [];
 		}
 	}
 
@@ -223,10 +234,14 @@
 	}
 
 	function getTypeName(type: string) {
+		const hit = stockInTypes.find((x: any) => x?.dict_value === type);
+		if (hit?.dict_label) return hit.dict_label;
 		const map: Record<string, string> = {
 			purchase: '采购入库',
 			return: '销售退货入库',
-			reversal: '退料入库'
+			sales_return: '销售退货入库',
+			reversal: '退料入库',
+			production: '生产入库'
 		};
 		return map[type] || type || '-';
 	}
@@ -244,6 +259,7 @@
 		loadData(1);
 		loadWarehouses();
 		loadSuppliers();
+		loadStockInTypes();
 	});
 </script>
 
@@ -276,9 +292,16 @@
 					bind:value={filters.stock_in_type}
 				>
 					<option value="">入库类型</option>
-					<option value="purchase">采购入库</option>
-					<option value="return">销售退货入库</option>
-					<option value="reversal">退料入库</option>
+					{#if stockInTypes.length > 0}
+						{#each stockInTypes as t}
+							<option value={t.dict_value}>{t.dict_label}</option>
+						{/each}
+					{:else}
+						<option value="purchase">采购入库</option>
+						<option value="sales_return">销售退货入库</option>
+						<option value="reversal">退料入库</option>
+						<option value="production">生产入库</option>
+					{/if}
 				</select>
 				<select
 					class="select bg-base-200 focus:bg-base-100 h-10 min-h-10 w-[9.5rem] shrink-0 rounded-lg border-none py-0 pr-8 pl-2 text-base leading-tight"

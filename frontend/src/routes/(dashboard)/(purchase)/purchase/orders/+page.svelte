@@ -358,7 +358,7 @@
 				<a class={dgRowBtn} href={`/purchase/orders/${order.id}`}>
 					<FileText size={16} /> 详情
 				</a>
-				{#if order.order_status === 'ordered'}
+				{#if order.order_status === 'draft' || order.order_status === 'ordered'}
 					<button type="button" class={dgRowBtnPrimary} onclick={() => navigateToEdit(order)}>
 						<SquarePen size={16} /> 编辑
 					</button>

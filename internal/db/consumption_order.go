@@ -115,6 +115,12 @@ func CreateConsumptionOrder(ctx context.Context, req request.ConsumptionOrderCre
 	}
 	defer tx.Rollback(ctx)
 
+	if req.ProducedMaterialID != 0 || req.ProducedWarehouseID != 0 || req.ProducedQuantity != 0 {
+		if req.ProducedMaterialID <= 0 || req.ProducedWarehouseID <= 0 || req.ProducedQuantity <= 0 {
+			return 0, fmt.Errorf("自动生产入库字段需同时填写：produced_material_id / produced_warehouse_id / produced_quantity")
+		}
+	}
+
 	wantQty := make(map[int64]float64)
 	invSeen := make(map[int64]struct{})
 	invIDs := make([]int64, 0, len(req.Items))
@@ -180,14 +186,20 @@ func CreateConsumptionOrder(ctx context.Context, req request.ConsumptionOrderCre
 	orderQuery := `
 		INSERT INTO consumption_order (
 			order_no, project_no, product_name,
-			order_date, designer_id, designer_name, status, remark, created_by
+			order_date, designer_id, designer_name, status, remark, created_by,
+			produced_material_id, produced_quantity, produced_warehouse_id,
+			production_order_id, production_return_order_id
 		) VALUES (
-			fn_generate_consumption_order_no(), $1, $2, $3, $4, $5, 'pending', $6, $7
+			fn_generate_consumption_order_no(), $1, $2, $3, $4, $5, 'pending', $6, $7,
+			NULLIF($8, 0), NULLIF($9::float8, 0), NULLIF($10, 0),
+			NULLIF($11, 0), NULLIF($12, 0)
 		) RETURNING id
 	`
 	err = tx.QueryRow(ctx, orderQuery,
 		req.ProjectNo, req.ProductName,
 		req.OrderDateTime, req.DesignerID, req.DesignerName, req.Remark, userID,
+		req.ProducedMaterialID, req.ProducedQuantity, req.ProducedWarehouseID,
+		req.ProductionOrderID, req.ProductionReturnOrderID,
 	).Scan(&orderID)
 	if err != nil {
 		return 0, err
@@ -299,7 +311,9 @@ func ListConsumptionOrders(ctx context.Context, query request.ConsumptionOrderQu
 			COALESCE(warehouse_name, ''), order_date, designer_id, COALESCE(designer_name, ''), status,
 			COALESCE(stock_out_id, 0), COALESCE(stock_out_no, ''), COALESCE(remark, ''), created_at, updated_at,
 			item_count, total_quantity,
-			COALESCE((SELECT SUM(coi2.quantity * i.unit_cost) FROM consumption_order_item coi2 JOIN inventory i ON i.id = coi2.inventory_id WHERE coi2.order_id = co.id), 0) AS total_amount
+			COALESCE((SELECT SUM(coi2.quantity * i.unit_cost) FROM consumption_order_item coi2 JOIN inventory i ON i.id = coi2.inventory_id WHERE coi2.order_id = co.id), 0) AS total_amount,
+			COALESCE(production_order_id, 0), COALESCE(production_no, ''),
+			COALESCE(production_return_order_id, 0), COALESCE(production_return_no, '')
 		FROM v_consumption_order_list co
 		%s
 		ORDER BY created_at DESC
@@ -322,6 +336,8 @@ func ListConsumptionOrders(ctx context.Context, query request.ConsumptionOrderQu
 			&order.StockOutID, &order.StockOutNo, &order.Remark,
 			&order.CreatedAt, &order.UpdatedAt,
 			&order.ItemCount, &order.TotalQuantity, &order.TotalAmount,
+			&order.ProductionOrderID, &order.ProductionNo,
+			&order.ProductionReturnOrderID, &order.ProductionReturnNo,
 		)
 		if err != nil {
 			return nil, err
@@ -374,9 +390,20 @@ func GetConsumptionOrderDetail(ctx context.Context, id int64) (*response.Consump
 				''
 			),
 			co.order_date, co.designer_id, COALESCE(co.designer_name, ''), co.status,
-			COALESCE(co.stock_out_id, 0), COALESCE(so.stock_out_no, ''), COALESCE(co.remark, ''), co.created_at, co.updated_at
+			COALESCE(co.stock_out_id, 0), COALESCE(so.stock_out_no, ''), COALESCE(co.remark, ''), co.created_at, co.updated_at,
+			COALESCE(co.produced_material_id, 0), COALESCE(co.produced_warehouse_id, 0), COALESCE(co.produced_quantity, 0),
+			COALESCE(pm.material_code, ''), COALESCE(pm.material_name, ''),
+			COALESCE(pw.warehouse_code, ''), COALESCE(pw.warehouse_name, ''),
+			COALESCE(co.production_order_id, 0), COALESCE(po.production_no, ''),
+			COALESCE(po.stock_in_id, 0), COALESCE(psi.stock_in_no, ''),
+			COALESCE(co.production_return_order_id, 0), COALESCE(pro.return_no, '')
 		FROM consumption_order co
 		LEFT JOIN stock_out so ON so.id = co.stock_out_id
+		LEFT JOIN material pm ON pm.id = co.produced_material_id
+		LEFT JOIN warehouse pw ON pw.id = co.produced_warehouse_id AND pw.deleted_at IS NULL
+		LEFT JOIN production_order po ON po.id = co.production_order_id
+		LEFT JOIN stock_in psi ON psi.id = po.stock_in_id
+		LEFT JOIN production_return_order pro ON pro.id = co.production_return_order_id
 		WHERE co.id = $1 AND co.deleted_at IS NULL
 	`
 	var order response.ConsumptionOrderResp
@@ -386,6 +413,12 @@ func GetConsumptionOrderDetail(ctx context.Context, id int64) (*response.Consump
 		&order.OrderDate, &order.DesignerID, &order.DesignerName, &order.Status,
 		&order.StockOutID, &order.StockOutNo, &order.Remark,
 		&order.CreatedAt, &order.UpdatedAt,
+		&order.ProducedMaterialID, &order.ProducedWarehouseID, &order.ProducedQuantity,
+		&order.ProducedMaterialCode, &order.ProducedMaterialName,
+		&order.ProducedWarehouseCode, &order.ProducedWarehouseName,
+		&order.ProductionOrderID, &order.ProductionNo,
+		&order.ProductionStockInID, &order.ProductionStockInNo,
+		&order.ProductionReturnOrderID, &order.ProductionReturnNo,
 	)
 	if err != nil {
 		return nil, err
@@ -452,6 +485,12 @@ func UpdateConsumptionOrder(ctx context.Context, id int64, req request.Consumpti
 		return err
 	}
 	defer tx.Rollback(ctx)
+
+	if req.ProducedMaterialID != 0 || req.ProducedWarehouseID != 0 || req.ProducedQuantity != 0 {
+		if req.ProducedMaterialID <= 0 || req.ProducedWarehouseID <= 0 || req.ProducedQuantity <= 0 {
+			return fmt.Errorf("自动生产入库字段需同时填写：produced_material_id / produced_warehouse_id / produced_quantity")
+		}
+	}
 
 	var orderStatus string
 	var stockOutID int64
@@ -527,9 +566,13 @@ func UpdateConsumptionOrder(ctx context.Context, id int64, req request.Consumpti
 		UPDATE consumption_order
 		SET project_no = $1, product_name = $2, order_date = $3::date,
 		    designer_id = $4, designer_name = $5, remark = $6, stock_out_id = NULL,
+		    produced_material_id = NULLIF($9, 0),
+		    produced_quantity = NULLIF($10::float8, 0),
+		    produced_warehouse_id = NULLIF($11, 0),
 		    updated_by = $7, updated_at = NOW()
 		WHERE id = $8
-	`, req.ProjectNo, req.ProductName, req.OrderDate, req.DesignerID, req.DesignerName, req.Remark, userID, id); err != nil {
+	`, req.ProjectNo, req.ProductName, req.OrderDate, req.DesignerID, req.DesignerName, req.Remark,
+		userID, id, req.ProducedMaterialID, req.ProducedQuantity, req.ProducedWarehouseID); err != nil {
 		return err
 	}
 

@@ -102,14 +102,17 @@ func CreateReversalOrder(ctx context.Context, req request.ReversalOrderCreate, u
 	orderQuery := `
 		INSERT INTO reversal_order (
 			order_no, project_no, product_name, warehouse_id, warehouse_code,
-			order_date, designer_id, designer_name, status, remark, created_by
+			order_date, designer_id, designer_name, status, remark, created_by,
+			production_order_id, production_return_order_id
 		) VALUES (
-			fn_generate_reversal_order_no(), $1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9
+			fn_generate_reversal_order_no(), $1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9,
+			NULLIF($10, 0), NULLIF($11, 0)
 		) RETURNING id
 	`
 	err = tx.QueryRow(ctx, orderQuery,
 		req.ProjectNo, req.ProductName, headerWhID, headerWhCode,
 		req.OrderDate, req.DesignerID, req.DesignerName, req.Remark, userID,
+		req.ProductionOrderID, req.ProductionReturnOrderID,
 	).Scan(&orderID)
 	if err != nil {
 		return 0, err
@@ -219,7 +222,9 @@ func ListReversalOrders(ctx context.Context, query request.ReversalOrderQuery) (
 				FROM reversal_order_item roi
 				LEFT JOIN inventory inv ON inv.id = roi.inventory_id
 				WHERE roi.order_id = ro.id
-			), 0) AS total_amount
+			), 0) AS total_amount,
+			COALESCE(production_order_id, 0), COALESCE(production_no, ''),
+			COALESCE(production_return_order_id, 0), COALESCE(production_return_no, '')
 		FROM v_reversal_order_list ro
 		%s
 		ORDER BY created_at DESC
@@ -242,6 +247,8 @@ func ListReversalOrders(ctx context.Context, query request.ReversalOrderQuery) (
 			&order.StockInID, &order.StockInNo, &order.Remark,
 			&order.CreatedAt, &order.UpdatedAt,
 			&order.ItemCount, &order.TotalQuantity, &order.TotalAmount,
+			&order.ProductionOrderID, &order.ProductionNo,
+			&order.ProductionReturnOrderID, &order.ProductionReturnNo,
 		)
 		if err != nil {
 			return nil, err
@@ -263,10 +270,14 @@ func GetReversalOrderDetail(ctx context.Context, id int64) (*response.ReversalOr
 		SELECT 
 			ro.id, ro.order_no, ro.project_no, ro.product_name, ro.warehouse_id, COALESCE(ro.warehouse_code, ''),
 			COALESCE(w.warehouse_name, ''), ro.order_date, ro.designer_id, COALESCE(ro.designer_name, ''), ro.status,
-			COALESCE(ro.stock_in_id, 0), COALESCE(si.stock_in_no, ''), COALESCE(ro.remark, ''), ro.created_at, ro.updated_at
+			COALESCE(ro.stock_in_id, 0), COALESCE(si.stock_in_no, ''), COALESCE(ro.remark, ''), ro.created_at, ro.updated_at,
+			COALESCE(ro.production_order_id, 0), COALESCE(po.production_no, ''),
+			COALESCE(ro.production_return_order_id, 0), COALESCE(pro.return_no, '')
 		FROM reversal_order ro
 		LEFT JOIN warehouse w ON w.id = ro.warehouse_id
 		LEFT JOIN stock_in si ON si.id = ro.stock_in_id
+		LEFT JOIN production_order po ON po.id = ro.production_order_id
+		LEFT JOIN production_return_order pro ON pro.id = ro.production_return_order_id
 		WHERE ro.id = $1 AND ro.deleted_at IS NULL
 	`
 	var order response.ReversalOrderResp
@@ -276,6 +287,8 @@ func GetReversalOrderDetail(ctx context.Context, id int64) (*response.ReversalOr
 		&order.OrderDate, &order.DesignerID, &order.DesignerName, &order.Status,
 		&order.StockInID, &order.StockInNo, &order.Remark,
 		&order.CreatedAt, &order.UpdatedAt,
+		&order.ProductionOrderID, &order.ProductionNo,
+		&order.ProductionReturnOrderID, &order.ProductionReturnNo,
 	)
 	if err != nil {
 		return nil, err

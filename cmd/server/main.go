@@ -196,6 +196,7 @@ func main() {
 			protected.POST("/base/customers", handler.CreateCustomer)
 			protected.PUT("/base/customers/:id", handler.UpdateCustomer)
 			protected.DELETE("/base/customers/:id", handler.DeleteCustomer)
+			protected.GET("/base/partners/dropdown", handler.ListPartnerDropdown)
 
 			// Certificate Routes
 			protected.GET("/base/certificates", handler.ListCertificates)
@@ -219,10 +220,12 @@ func main() {
 
 			// Fund Routes
 			protected.GET("/fund/payments", handler.ListFundPayments)
+			protected.GET("/fund/payment-sources", handler.ListFundPaymentSources)
 			protected.GET("/fund/payments/:id", handler.GetFundPayment)
 			protected.POST("/fund/payments", handler.CreateFundPayment)
 
 			protected.GET("/fund/collections", handler.ListFundCollections)
+			protected.GET("/fund/collection-sources", handler.ListFundCollectionSources)
 			protected.GET("/fund/collections/:id", handler.GetFundCollection)
 			protected.POST("/fund/collections", handler.CreateFundCollection)
 
@@ -259,6 +262,22 @@ func main() {
 			protected.PUT("/reversal/orders/:id", handler.UpdateReversalOrder)
 			protected.POST("/reversal/orders/:id/confirm", handler.ConfirmReversalOrder)
 			protected.DELETE("/reversal/orders/:id", handler.DeleteReversalOrder)
+
+			// Production Routes (生产单/生产退货单)
+			protected.GET("/production/orders", handler.ListProductionOrders)
+			// 下拉列表必须在 :id 之前注册
+			protected.GET("/production/orders/dropdown", handler.ListProductionOrdersForDropdown)
+			protected.GET("/production/orders/:id", handler.GetProductionOrderDetail)
+			protected.PUT("/production/orders/:id", handler.UpdateProductionOrder)
+			protected.GET("/production/orders/:id/consumption-orders", handler.ListConsumptionOrdersByProduction)
+			protected.GET("/production/orders/:id/reversal-orders", handler.ListReversalOrdersByProduction)
+			protected.GET("/production/returns", handler.ListProductionReturnOrders)
+			// 下拉列表必须在 :id 之前注册
+			protected.GET("/production/returns/dropdown", handler.ListProductionReturnOrdersForDropdown)
+			protected.GET("/production/returns/:id", handler.GetProductionReturnOrderDetail)
+			protected.PUT("/production/returns/:id", handler.UpdateProductionReturnOrder)
+			protected.GET("/production/returns/:id/consumption-orders", handler.ListConsumptionOrdersByProductionReturn)
+			protected.GET("/production/returns/:id/reversal-orders", handler.ListReversalOrdersByProductionReturn)
 
 			// Stock Transfer Routes
 			protected.GET("/stock-transfers", handler.ListStockTransfers)
@@ -331,6 +350,9 @@ func main() {
 			protected.GET("/reports/inventory", handler.ReportInventoryStatus)
 			protected.GET("/reports/balance", handler.ReportInventoryBalance)
 			protected.GET("/reports/turnover", handler.ReportInventoryTurnover)
+			protected.GET("/reports/reconciliation/customers", handler.ReportCustomerReconciliationSummary)
+			protected.GET("/reports/reconciliation/suppliers", handler.ReportSupplierReconciliationSummary)
+			protected.GET("/reports/profit", handler.ReportProfit)
 
 			// Notification Routes
 			protected.GET("/notifications", handler.ListNotifications)

@@ -16,6 +16,79 @@ import (
 	"github.com/redgreat/teweicun/pkg/database"
 )
 
+func ListPartnerDropdown(ctx context.Context, q *request.PartnerDropdownQuery) ([]response.PartnerDropdownItem, error) {
+	limit := q.Limit
+	if limit <= 0 {
+		limit = 200
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	keyword := strings.TrimSpace(q.Keyword)
+	status := strings.TrimSpace(q.Status)
+	if status == "" {
+		status = "enabled"
+	}
+
+	where := []string{"deleted_at IS NULL"}
+	args := make([]interface{}, 0)
+	argID := 1
+
+	if keyword != "" {
+		if q.Type == "supplier" {
+			where = append(where, fmt.Sprintf("(supplier_name ILIKE $%d OR supplier_code ILIKE $%d)", argID, argID))
+		} else {
+			where = append(where, fmt.Sprintf("(customer_name ILIKE $%d OR customer_code ILIKE $%d)", argID, argID))
+		}
+		args = append(args, "%"+keyword+"%")
+		argID++
+	}
+	if status != "all" && status != "" {
+		where = append(where, fmt.Sprintf("status = $%d", argID))
+		args = append(args, status)
+		argID++
+	}
+
+	whereClause := strings.Join(where, " AND ")
+
+	var sql string
+	if q.Type == "supplier" {
+		sql = fmt.Sprintf(`
+			SELECT id, supplier_code, supplier_name
+			FROM supplier
+			WHERE %s
+			ORDER BY supplier_code ASC, id DESC
+			LIMIT $%d
+		`, whereClause, argID)
+	} else {
+		sql = fmt.Sprintf(`
+			SELECT id, customer_code, customer_name
+			FROM customer
+			WHERE %s
+			ORDER BY customer_code ASC, id DESC
+			LIMIT $%d
+		`, whereClause, argID)
+	}
+	args = append(args, limit)
+
+	rows, err := database.Pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]response.PartnerDropdownItem, 0)
+	for rows.Next() {
+		var it response.PartnerDropdownItem
+		if err := rows.Scan(&it.ID, &it.Code, &it.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
 // ListCustomers 分页查询客户
 func ListCustomers(ctx context.Context, q *request.CustomerQuery) ([]response.CustomerResp, int64, error) {
 	where := []string{"1=1"}
@@ -80,10 +153,10 @@ func ListCustomers(ctx context.Context, q *request.CustomerQuery) ([]response.Cu
 }
 
 // CreateCustomer 创建客户
-func CreateCustomer(ctx context.Context, req *request.CreateCustomerReq, userID int64, username string) (int64, error) {
+func CreateCustomer(ctx context.Context, req *request.CreateCustomerReq, userID int64, username string) (int64, string, error) {
 	tx, err := database.Pool.Begin(ctx)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	defer tx.Rollback(ctx)
 
@@ -91,7 +164,7 @@ func CreateCustomer(ctx context.Context, req *request.CreateCustomerReq, userID 
 	var customerCode string
 	err = tx.QueryRow(ctx, "SELECT fn_generate_base_code('C')").Scan(&customerCode)
 	if err != nil {
-		return 0, fmt.Errorf("生成客户编码失败: %w", err)
+		return 0, "", fmt.Errorf("生成客户编码失败: %w", err)
 	}
 
 	var id int64
@@ -104,17 +177,17 @@ func CreateCustomer(ctx context.Context, req *request.CreateCustomerReq, userID 
 	err = tx.QueryRow(ctx, query, customerCode, req.CustomerName, req.CreditCode,
 		req.ContactPerson, req.ContactPhone, req.Address, req.Remark, userID).Scan(&id)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
 	// 审计日志调用
 	auditQuery := `CALL sp_write_audit_log($1, $2, $3, $4, $5, $6, $7)`
 	_, err = tx.Exec(ctx, auditQuery, userID, username, "CREATE", "CUSTOMER", "customer", id, nil)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
-	return id, tx.Commit(ctx)
+	return id, customerCode, tx.Commit(ctx)
 }
 
 // UpdateCustomer 更新客户

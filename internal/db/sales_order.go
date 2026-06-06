@@ -480,129 +480,49 @@ func CancelSalesOrder(ctx context.Context, orderID int64, userID int64, username
 	return nil
 }
 
-// ShipSalesOrder 发货
+// ShipSalesOrder 返回销售订单提交时已自动生成的出库单。
+// 兼容旧前端入口；新流程不再由 Go 层手工创建销售出库单。
 func ShipSalesOrder(ctx context.Context, orderID int64, req *request.ShipSalesOrderReq, userID int64, username string) (int64, error) {
-	tx, err := database.Pool.Begin(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback(ctx)
+	_ = req
+	_ = username
 
-	var existingStockOutID int64
-	err = tx.QueryRow(ctx, `
-		SELECT id
-		FROM stock_out
-		WHERE ref_doc_type = 'sales_order'
-		  AND ref_doc_id = $1
-		  AND deleted_at IS NULL
-		  AND status IN ('draft', 'pending')
-		ORDER BY id DESC
-		LIMIT 1
-	`, orderID).Scan(&existingStockOutID)
-	if err == nil {
-		return existingStockOutID, tx.Commit(ctx)
-	}
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return 0, err
-	}
-
-	var orderNo string
+	var stockOutID int64
 	var orderStatus string
-	var customerCode string
-	var customerName string
-	var receiverName string
-	err = tx.QueryRow(ctx, `
-		SELECT order_no, order_status, customer_code, COALESCE(customer_name, ''), COALESCE(receiver_name, '')
+	err := database.Pool.QueryRow(ctx, `
+		SELECT COALESCE(stock_out_id, 0), order_status
 		FROM sales_order
-		WHERE id = $1 AND deleted_at IS NULL
-		FOR UPDATE
-	`, orderID).Scan(&orderNo, &orderStatus, &customerCode, &customerName, &receiverName)
+		WHERE id = $1
+		  AND deleted_at IS NULL
+	`, orderID).Scan(&stockOutID, &orderStatus)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, errcode.NewAppError(errcode.ErrInvalidParam.Code, "销售订单不存在", errcode.ErrInvalidParam.HTTPCode)
 		}
 		return 0, err
 	}
-	if orderStatus != "confirmed" && orderStatus != "preparing" {
-		return 0, errcode.NewAppError(errcode.ErrInvalidParam.Code, "当前状态不允许生成销售出库单", errcode.ErrInvalidParam.HTTPCode)
-	}
-
-	rows, err := tx.Query(ctx, `
-		SELECT material_id, quantity - shipped_quantity AS remain_qty
-		FROM sales_order_item
-		WHERE order_id = $1
-		  AND quantity > shipped_quantity
-		ORDER BY id
-	`, orderID)
-	if err != nil {
-		return 0, err
-	}
-	defer rows.Close()
-
-	type pendingItem struct {
-		materialID int64
-		quantity   float64
-	}
-	var items []pendingItem
-	for rows.Next() {
-		var item pendingItem
-		if err := rows.Scan(&item.materialID, &item.quantity); err != nil {
-			return 0, err
+	if stockOutID <= 0 {
+		if orderStatus == "draft" {
+			return 0, errcode.NewAppError(errcode.ErrInvalidParam.Code, "请先提交销售订单，提交后由数据库自动生成出库单", errcode.ErrInvalidParam.HTTPCode)
 		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return 0, err
-	}
-	if len(items) == 0 {
-		return 0, errcode.NewAppError(errcode.ErrInvalidParam.Code, "销售订单已全部出库，无需重复生成", errcode.ErrInvalidParam.HTTPCode)
+		return 0, errcode.NewAppError(errcode.ErrInvalidParam.Code, "销售订单未关联出库单，请检查提交过程", errcode.ErrInvalidParam.HTTPCode)
 	}
 
-	var stockOutNo string
-	err = tx.QueryRow(ctx, "SELECT fn_generate_serial_no('SO')").Scan(&stockOutNo)
-	if err != nil {
-		return 0, err
-	}
-
-	stockOutDate := strings.TrimSpace(req.StockOutDate)
-	if stockOutDate == "" {
-		stockOutDate = time.Now().Format("2006-01-02")
-	}
-	receiver := strings.TrimSpace(receiverName)
-	if receiver == "" {
-		receiver = strings.TrimSpace(customerName)
-	}
-
-	var stockOutID int64
-	err = tx.QueryRow(ctx, `
-		INSERT INTO stock_out (
-			stock_out_no, stock_out_date, out_type, ref_doc_type, ref_doc_id,
-			customer_code, customer_name, receiver, status, remark, created_by
+	var exists bool
+	if err := database.Pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM stock_out
+			WHERE id = $1
+			  AND ref_doc_type = 'sales_order'
+			  AND ref_doc_id = $2
+			  AND deleted_at IS NULL
 		)
-		VALUES ($1, $2, 'sales', 'sales_order', $3, NULLIF($4, ''), NULLIF($5, ''), $6, 'draft', $7, $8)
-		RETURNING id
-	`, stockOutNo, stockOutDate, orderID, customerCode, customerName, receiver, strings.TrimSpace(req.Remark), userID).Scan(&stockOutID)
-	if err != nil {
+	`, stockOutID, orderID).Scan(&exists); err != nil {
 		return 0, err
 	}
-
-	for _, item := range items {
-		_, err = tx.Exec(ctx, `
-			INSERT INTO stock_out_item (stock_out_id, material_id, quantity, unit)
-			SELECT $1, $2, $3, COALESCE(soi.unit, m.unit, '')
-			FROM sales_order_item soi
-			LEFT JOIN material m ON m.id = soi.material_id
-			WHERE soi.order_id = $4 AND soi.material_id = $2
-			ORDER BY soi.id
-			LIMIT 1
-		`, stockOutID, item.materialID, item.quantity, orderID)
-		if err != nil {
-			return 0, err
-		}
+	if !exists {
+		return 0, errcode.NewAppError(errcode.ErrInvalidParam.Code, "关联出库单不存在或已删除", errcode.ErrInvalidParam.HTTPCode)
 	}
 
-	auditQuery := `CALL sp_write_audit_log($1, $2, $3, $4, $5, $6, $7)`
-	_, _ = tx.Exec(ctx, auditQuery, userID, username, "CREATE_STOCK_OUT", "SALES", "stock_out", stockOutID, nil)
-
-	return stockOutID, tx.Commit(ctx)
+	_ = userID
+	return stockOutID, nil
 }

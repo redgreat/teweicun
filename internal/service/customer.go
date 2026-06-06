@@ -18,7 +18,7 @@ func ListCustomers(ctx context.Context, q *request.CustomerQuery) ([]response.Cu
 	return db.ListCustomers(ctx, q)
 }
 
-func CreateCustomer(ctx context.Context, req *request.CreateCustomerReq, userID int64, username string) (int64, error) {
+func CreateCustomer(ctx context.Context, req *request.CreateCustomerReq, userID int64, username string) (int64, string, error) {
 	return db.CreateCustomer(ctx, req, userID, username)
 }
 
@@ -28,4 +28,8 @@ func UpdateCustomer(ctx context.Context, id int64, req *request.UpdateCustomerRe
 
 func DeleteCustomer(ctx context.Context, id int64, userID int64, username string) error {
 	return db.DeleteCustomer(ctx, id, userID, username)
+}
+
+func ListPartnerDropdown(ctx context.Context, q *request.PartnerDropdownQuery) ([]response.PartnerDropdownItem, error) {
+	return db.ListPartnerDropdown(ctx, q)
 }

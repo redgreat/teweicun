@@ -9,7 +9,7 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { ArrowLeft, FileText, Building2, Calendar, BadgeCheck, Coins, PackageOpen, Pencil } from 'lucide-svelte';
+	import { ArrowLeft, FileText, Building2, Calendar, BadgeCheck, Coins, PackageOpen, Pencil, Printer } from 'lucide-svelte';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
 	let loading = $state(true);
@@ -79,19 +79,22 @@
 		</div>
 	</div>
 
-	<div class="flex flex-wrap items-center justify-between gap-3">
+	<div class="flex flex-wrap items-center justify-between gap-3 print:hidden">
 		<div class="flex flex-wrap items-center gap-2">
 			<a href="/purchase/orders" class="btn btn-ghost btn-sm gap-1">
 				<ArrowLeft size={14} /> 返回列表
 			</a>
-			{#if order?.order_status === 'ordered'}
-				<a href={`/purchase/orders/${order.id}/edit`} class="btn btn-primary btn-sm gap-1">
-					<Pencil size={14} /> 编辑
-				</a>
-			{/if}
+			{#if order?.order_status === 'draft' || order?.order_status === 'ordered'}
+					<a href={`/purchase/orders/${order.id}/edit`} class="btn btn-primary btn-sm gap-1">
+						<Pencil size={14} /> 编辑
+					</a>
+				{/if}
 		</div>
 		{#if order}
 			<div class="flex items-center gap-2">
+				<button class="btn btn-outline btn-sm gap-1" onclick={() => window.print()}>
+					<Printer size={16} /> 打印
+				</button>
 				<span class="badge badge-sm {statusBadgeClass(order.order_status)}"
 					>{order.order_status_name || order.order_status}</span
 				>

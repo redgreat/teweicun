@@ -19,7 +19,7 @@ import (
 	"github.com/redgreat/teweicun/pkg/database"
 )
 
-func ensurePurchaseOrderDraft(ctx context.Context, id int64) error {
+func ensurePurchaseOrderNotReceived(ctx context.Context, id int64) error {
 	var status string
 	err := database.Pool.QueryRow(ctx, `
 		SELECT po.order_status
@@ -32,8 +32,24 @@ func ensurePurchaseOrderDraft(ctx context.Context, id int64) error {
 		}
 		return err
 	}
-	if status != "draft" {
-		return errcode.NewAppError(errcode.ErrForbidden.Code, "仅待提交状态的单据才允许编辑或删除", errcode.ErrForbidden.HTTPCode)
+	if status != "draft" && status != "ordered" {
+		return errcode.NewAppError(errcode.ErrForbidden.Code, "仅待提交或已下单且未入库的单据才允许编辑或删除", errcode.ErrForbidden.HTTPCode)
+	}
+
+	if status == "ordered" {
+		var hasReceived bool
+		err = database.Pool.QueryRow(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM purchase_order_item
+				WHERE order_id = $1 AND COALESCE(received_quantity, 0) > 0
+			)
+		`, id).Scan(&hasReceived)
+		if err != nil {
+			return err
+		}
+		if hasReceived {
+			return errcode.NewAppError(errcode.ErrForbidden.Code, "已有入库记录，不可编辑或删除", errcode.ErrForbidden.HTTPCode)
+		}
 	}
 	return nil
 }
@@ -330,8 +346,8 @@ func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurch
 		return err
 	}
 
-	if orderStatus != "ordered" {
-		return errcode.NewAppError(errcode.ErrForbidden.Code, "仅待收货状态允许编辑", errcode.ErrForbidden.HTTPCode)
+	if orderStatus != "draft" && orderStatus != "ordered" {
+		return errcode.NewAppError(errcode.ErrForbidden.Code, "仅待提交或已下单且未入库的单据允许编辑", errcode.ErrForbidden.HTTPCode)
 	}
 
 	var hasReceived bool
@@ -409,11 +425,15 @@ func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurch
 		return err
 	}
 
+	if orderStatus == "ordered" {
+		return nil
+	}
+
 	return ConfirmPurchaseOrder(ctx, id, userID)
 }
 
 func DeletePurchaseOrder(ctx context.Context, id int64) error {
-	if err := ensurePurchaseOrderDraft(ctx, id); err != nil {
+	if err := ensurePurchaseOrderNotReceived(ctx, id); err != nil {
 		return err
 	}
 	query := `UPDATE purchase_order SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`

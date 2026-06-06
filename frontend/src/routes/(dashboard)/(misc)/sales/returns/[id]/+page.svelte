@@ -9,24 +9,14 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import {
-		ArrowLeft,
-		FileText,
-		Calendar,
-		User,
-		CheckCircle,
-		Trash2,
-		ClipboardList,
-		PackageOpen,
-		Pencil
-	} from 'lucide-svelte';
+	import { ArrowLeft, FileText, Calendar, User, CheckCircle, Trash2, ClipboardList, PackageOpen, Pencil, Printer } from 'lucide-svelte';
 	import { getStatusStyle } from '$lib/statusStyles';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
 	let loading = $state(true);
 	let detail = $state<any | null>(null);
 	let acting = $state(false);
-		let showEdit = $state(false);
+	let showEdit = $state(false);
 
 	function formatMoney(value: number) {
 		const amount = Number(value) || 0;
@@ -68,7 +58,7 @@
 		acting = true;
 		try {
 			await api.post(`/returns/${detail.id}/confirm`, {});
-			toast.success('销售退货已确认入库');
+			toast.success('销售退货已提交，已生成待入库单');
 			await loadDetail(detail.id);
 		} catch (err: any) {
 			toast.error('确认失败: ' + (err?.message || err));
@@ -118,19 +108,22 @@
 		</div>
 	</div>
 
-	<div class="flex flex-wrap items-center justify-between gap-3">
+	<div class="flex flex-wrap items-center justify-between gap-3 print:hidden">
 		<a href="/sales/returns" class="btn btn-ghost btn-sm gap-1">
 			<ArrowLeft size={14} /> 返回列表
 		</a>
 		{#if detail}
 			<div class="flex flex-wrap items-center gap-2">
+				<button class="btn btn-outline btn-sm gap-1" onclick={() => window.print()}>
+					<Printer size={16} /> 打印
+				</button>
 				{#if detail.status === 'draft'}
 					<button
 						class="btn btn-sm btn-success text-white"
 						onclick={handleConfirm}
 						disabled={acting}
 					>
-						<CheckCircle size={16} /> 确认入库
+						<CheckCircle size={16} /> 提交
 					</button>
 					<button class="btn btn-sm btn-error btn-outline" onclick={handleDelete} disabled={acting}>
 						<Trash2 size={16} /> 删除

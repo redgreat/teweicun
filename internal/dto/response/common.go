@@ -18,6 +18,12 @@ type PageResult struct {
 	List  interface{} `json:"list"`
 }
 
+type PartnerDropdownItem struct {
+	ID   int64  `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
 // SuccessPage returns a paginated success response
 func SuccessPage(c *gin.Context, total int64, list interface{}) {
 	c.JSON(http.StatusOK, Response{

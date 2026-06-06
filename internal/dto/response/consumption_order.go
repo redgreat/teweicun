@@ -18,6 +18,19 @@ type ConsumptionOrderResp struct {
 	StockOutID    int64                      `json:"stock_out_id"`
 	StockOutNo    string                     `json:"stock_out_no"`
 	Remark        string                     `json:"remark"`
+	ProducedMaterialID  int64   `json:"produced_material_id"`
+	ProducedWarehouseID int64   `json:"produced_warehouse_id"`
+	ProducedQuantity    float64 `json:"produced_quantity"`
+	ProducedMaterialCode string  `json:"produced_material_code"`
+	ProducedMaterialName string  `json:"produced_material_name"`
+	ProducedWarehouseCode string `json:"produced_warehouse_code"`
+	ProducedWarehouseName string `json:"produced_warehouse_name"`
+	ProductionOrderID    int64  `json:"production_order_id"`
+	ProductionNo         string `json:"production_no"`
+	ProductionStockInID  int64  `json:"production_stock_in_id"`
+	ProductionStockInNo  string `json:"production_stock_in_no"`
+	ProductionReturnOrderID   int64  `json:"production_return_order_id"`
+	ProductionReturnNo        string `json:"production_return_no"`
 	CreatedAt     time.Time                  `json:"created_at"`
 	UpdatedAt     time.Time                  `json:"updated_at"`
 	Items         []ConsumptionOrderItemResp `json:"items"`

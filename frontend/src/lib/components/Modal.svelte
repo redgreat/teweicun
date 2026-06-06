@@ -12,7 +12,7 @@
 		show = $bindable(false),
 		title = '',
 		children,
-		onConfirm,
+		onConfirm = undefined,
 		confirmText = '确定',
 		cancelText = '取消',
 		loading = false,

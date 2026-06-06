@@ -45,7 +45,9 @@
 			icon: TrendingUp,
 			children: [
 				{ name: '领料订单', path: '/consumption/orders' },
-				{ name: '退料订单', path: '/reversal/orders' }
+				{ name: '退料订单', path: '/reversal/orders' },
+				{ name: '生产单据', path: '/production/orders' },
+				{ name: '生产退货单', path: '/production/returns' }
 			]
 		},
 		{
@@ -60,8 +62,11 @@
 			name: '对账管理',
 			icon: ReceiptText,
 			children: [
+				{ name: '客户对账', path: '/reconciliation/customer' },
+				{ name: '供应商对账', path: '/reconciliation/supplier' },
 				{ name: '采购对账', path: '/reconciliation/purchase' },
-				{ name: '销售对账', path: '/reconciliation/sales' }
+				{ name: '销售对账', path: '/reconciliation/sales' },
+				{ name: '利润表', path: '/reconciliation/profit' }
 			]
 		},
 		{ name: '库存台账', icon: ClipboardCheck, path: '/inventory/stock' },
@@ -89,7 +94,7 @@
 </script>
 
 <aside
-	class="bg-base-100 border-base-300 flex h-full flex-col border-r transition-all duration-300 {collapsed
+	class="bg-base-100 border-base-300 flex h-full flex-col border-r transition-all duration-300 print:hidden {collapsed
 		? 'w-20'
 		: 'w-64'}"
 >

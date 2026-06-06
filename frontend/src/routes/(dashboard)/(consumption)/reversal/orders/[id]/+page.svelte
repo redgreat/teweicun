@@ -3,7 +3,7 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { ArrowLeft, FileText, Calendar, BadgeCheck, ClipboardList } from 'lucide-svelte';
+	import { ArrowLeft, FileText, Calendar, BadgeCheck, ClipboardList, Printer } from 'lucide-svelte';
 	import { getStatusStyle } from '$lib/statusStyles';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
@@ -75,7 +75,7 @@
 		</div>
 	</div>
 
-	<div class="flex flex-wrap items-center justify-between gap-3">
+	<div class="flex flex-wrap items-center justify-between gap-3 print:hidden">
 		<div class="flex flex-wrap items-center gap-2">
 			<a href="/reversal/orders" class="btn btn-ghost gap-1 text-base">
 				<ArrowLeft size={18} /> 返回列表
@@ -85,6 +85,9 @@
 		{#if order}
 			{@const style = getStatusStyle(order.status, 'reversal_order')}
 			<div class="flex flex-wrap items-center gap-2">
+				<button class="btn btn-outline btn-sm gap-1" onclick={() => window.print()}>
+					<Printer size={16} /> 打印
+				</button>
 				<span class="badge badge-lg {style.class}">{style.label}</span>
 				<span class="text-base-content/70 font-mono">{order.order_no}</span>
 			</div>
@@ -245,3 +248,10 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	@page {
+		size: A4;
+		margin: 12mm;
+	}
+</style>

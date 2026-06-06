@@ -36,3 +36,33 @@ type InventoryStatusReport struct {
 	LockedQuantity    float64 `json:"locked_quantity"`
 	AvailableQuantity float64 `json:"available_quantity"`
 }
+
+type CustomerReconciliationSummaryReport struct {
+	CustomerID       int64   `json:"customer_id"`
+	CustomerCode     string  `json:"customer_code"`
+	CustomerName     string  `json:"customer_name"`
+	ReceivableAmount float64 `json:"receivable_amount"`
+	VerifiedAmount   float64 `json:"verified_amount"`
+	BalanceAmount    float64 `json:"balance_amount"`
+	ActualAmount     float64 `json:"actual_amount"`
+	InvoiceAmount    float64 `json:"invoice_amount"`
+	DiscountAmount   float64 `json:"discount_amount"`
+}
+
+type SupplierReconciliationSummaryReport struct {
+	SupplierID     int64   `json:"supplier_id"`
+	SupplierCode   string  `json:"supplier_code"`
+	SupplierName   string  `json:"supplier_name"`
+	PayableAmount  float64 `json:"payable_amount"`
+	VerifiedAmount float64 `json:"verified_amount"`
+	BalanceAmount  float64 `json:"balance_amount"`
+	ActualAmount   float64 `json:"actual_amount"`
+	InvoiceAmount  float64 `json:"invoice_amount"`
+	DiscountAmount float64 `json:"discount_amount"`
+}
+
+type ProfitReport struct {
+	SalesAmount float64 `json:"sales_amount"`
+	CostAmount  float64 `json:"cost_amount"`
+	Profit      float64 `json:"profit"`
+}

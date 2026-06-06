@@ -11,13 +11,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { FileText, CircleCheckBig, Truck, Ban } from 'lucide-svelte';
-	import {
-		dgRowBtn,
-		dgRowBtnDanger,
-		dgRowBtnPrimary,
-		dgRowBtnSuccess,
-		dgToolbarBtn
-	} from '$lib/dgButtonClasses';
+	import { dgRowBtn, dgRowBtnDanger, dgRowBtnSuccess, dgToolbarBtn } from '$lib/dgButtonClasses';
 	import { getStatusStyle } from '$lib/statusStyles';
 	import { formatDateInCn } from '$lib/datetime';
 
@@ -202,19 +196,13 @@
 		}
 	}
 
-	async function handleCreateStockOut(row: any) {
-		try {
-			const res: any = await api.post(`/sales/orders/${row.id}/ship`, {});
-			const stockOutID = Number(res?.stock_out_id || 0);
-			if (!stockOutID) {
-				toast.error('未生成销售出库单');
-				return;
-			}
-			toast.success('已生成销售出库单');
-			goto(`/stock/out/${stockOutID}?mode=confirm`);
-		} catch (err: any) {
-			toast.error('生成销售出库单失败: ' + (err?.message || err));
+	function openStockOut(row: any) {
+		const stockOutID = Number(row?.stock_out_id || 0);
+		if (!stockOutID) {
+			toast.error('该销售订单未关联出库单，请刷新后重试');
+			return;
 		}
+		goto(`/stock/out/${stockOutID}`);
 	}
 
 	onMount(() => {
@@ -357,8 +345,8 @@
 					</button>
 				{/if}
 				{#if row.order_status === 'confirmed' || row.order_status === 'preparing'}
-					<button type="button" class={dgRowBtnPrimary} onclick={() => handleCreateStockOut(row)}>
-						<Truck size={16} /> 销售出
+					<button type="button" class={dgRowBtn} onclick={() => openStockOut(row)}>
+						<Truck size={16} /> 出库单
 					</button>
 				{/if}
 				{#if row.order_status !== 'shipped' && row.order_status !== 'cancelled'}

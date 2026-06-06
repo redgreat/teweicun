@@ -86,10 +86,10 @@ func ListSuppliers(ctx context.Context, q *request.SupplierQuery) ([]response.Su
 }
 
 // CreateSupplier 创建供应商
-func CreateSupplier(ctx context.Context, req *request.CreateSupplierReq, userID int64, username string) (int64, error) {
+func CreateSupplier(ctx context.Context, req *request.CreateSupplierReq, userID int64, username string) (int64, string, error) {
 	tx, err := database.Pool.Begin(ctx)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	defer tx.Rollback(ctx)
 
@@ -97,7 +97,7 @@ func CreateSupplier(ctx context.Context, req *request.CreateSupplierReq, userID 
 	var supplierCode string
 	err = tx.QueryRow(ctx, "SELECT fn_generate_base_code('S')").Scan(&supplierCode)
 	if err != nil {
-		return 0, fmt.Errorf("生成供应商编码失败: %w", err)
+		return 0, "", fmt.Errorf("生成供应商编码失败: %w", err)
 	}
 
 	var id int64
@@ -113,17 +113,17 @@ func CreateSupplier(ctx context.Context, req *request.CreateSupplierReq, userID 
 		req.ContactPhone, req.Address, req.IsQualified, req.QualificationExpire, req.BankName,
 		req.BankAccount, req.Remark, userID).Scan(&id)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
 	// 审计日志
 	auditQuery := `CALL sp_write_audit_log($1, $2, $3, $4, $5, $6, $7)`
 	_, err = tx.Exec(ctx, auditQuery, userID, username, "CREATE", "SUPPLIER", "supplier", id, nil)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 
-	return id, tx.Commit(ctx)
+	return id, supplierCode, tx.Commit(ctx)
 }
 
 // UpdateSupplier 更新供应商

@@ -115,7 +115,8 @@ export function getStatusStyle(status: string, module: string): StatusStyle {
 				class: 'badge-ghost bg-base-200 text-base-content/70 border-base-300',
 				label: '待提交'
 			},
-			confirmed: { class: 'badge-success text-white', label: '已完成' }
+			confirmed: { class: 'badge-info badge-outline', label: '待入库' },
+			completed: { class: 'badge-success text-white', label: '已完成' }
 		};
 		return map[s] || { class: 'badge-ghost', label: status || '-' };
 	}

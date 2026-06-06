@@ -23,6 +23,8 @@ type ReversalOrderCreate struct {
 	OrderDate     string                    `json:"order_date" binding:"required"` // 前端传 YYYY-MM-DD
 	DesignerID    int64                     `json:"designer_id"`                    // 由后端登录态注入
 	DesignerName  string                    `json:"designer_name"`                  // 由后端登录态注入
+	ProductionOrderID       int64                     `json:"production_order_id"`        // 关联已有生产单（可选）
+	ProductionReturnOrderID int64                     `json:"production_return_order_id"` // 关联已有生产退货单（可选）
 	Remark        string                    `json:"remark"`
 	Items         []ReversalOrderItemCreate `json:"items" binding:"required,min=1,dive"`
 }

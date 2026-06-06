@@ -3,20 +3,7 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import {
-		ArrowLeft,
-		FileText,
-		Warehouse,
-		Calendar,
-		BadgeCheck,
-		Building2,
-		QrCode,
-		CheckCircle2,
-		Wand2,
-		X,
-		Hash,
-		ClipboardList
-	} from 'lucide-svelte';
+	import { ArrowLeft, FileText, Warehouse, Calendar, BadgeCheck, Building2, QrCode, CheckCircle2, Wand2, X, Hash, ClipboardList, Printer } from 'lucide-svelte';
 	import { fade } from 'svelte/transition';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
@@ -258,7 +245,9 @@
 		const map: Record<string, string> = {
 			purchase: '采购入库',
 			return: '销售退货入库',
-			reversal: '退料入库'
+			sales_return: '销售退货入库',
+			reversal: '退料入库',
+			production: '生产入库'
 		};
 		return map[t] || t || '-';
 	}
@@ -406,7 +395,7 @@
 		</div>
 	</div>
 
-	<div class="flex items-center justify-between gap-3">
+	<div class="flex items-center justify-between gap-3 print:hidden">
 		<a href="/stock/in" class="btn btn-ghost btn-sm gap-1">
 			<ArrowLeft size={14} /> 返回列表
 		</a>
@@ -429,6 +418,9 @@
 						{stockInStatusName(detail.stock_in_status)}
 					</span>
 					<span class="text-base-content/60 font-mono text-base">{detail.stock_in_no}</span>
+					<button class="btn btn-outline btn-sm gap-1" onclick={() => window.print()}>
+						<Printer size={16} /> 打印
+					</button>
 					{#if detail.stock_in_type !== 'reversal'}
 						<button class="btn btn-sm btn-ghost text-primary" onclick={openConfirmLogModal}>
 							<ClipboardList size={15} /> 入库日志
@@ -924,3 +916,10 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	@page {
+		size: A4;
+		margin: 12mm;
+	}
+</style>

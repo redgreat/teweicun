@@ -9,18 +9,7 @@
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import {
-		ArrowLeft,
-		FileText,
-		Calendar,
-		BadgeCheck,
-		User,
-		CheckCircle,
-		QrCode,
-		Wand2,
-		X,
-		Hash
-	} from 'lucide-svelte';
+	import { ArrowLeft, FileText, Calendar, BadgeCheck, User, CheckCircle, QrCode, Wand2, X, Hash, Printer } from 'lucide-svelte';
 	import { fade } from 'svelte/transition';
 	import { formatDateInCn, formatDateTimeInCn } from '$lib/datetime';
 
@@ -382,7 +371,7 @@
 		</div>
 	</div>
 
-	<div class="flex items-center justify-between gap-3">
+	<div class="flex items-center justify-between gap-3 print:hidden">
 		<a href="/stock/out" class="btn btn-ghost btn-sm gap-1">
 			<ArrowLeft size={14} /> 返回列表
 		</a>
@@ -405,6 +394,9 @@
 						>{statusName(detail.status)}</span
 					>
 					<span class="text-base-content/60 font-mono text-base">{detail.stock_out_no}</span>
+					<button class="btn btn-outline btn-sm gap-1" onclick={() => window.print()}>
+						<Printer size={16} /> 打印
+					</button>
 				</div>
 			{/if}
 		{/if}
@@ -801,3 +793,10 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	@page {
+		size: A4;
+		margin: 12mm;
+	}
+</style>

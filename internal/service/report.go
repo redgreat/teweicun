@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"github.com/redgreat/teweicun/internal/db"
+	"github.com/redgreat/teweicun/internal/dto/request"
 	"github.com/redgreat/teweicun/internal/dto/response"
 )
 
@@ -23,4 +24,16 @@ func ReportStockOutSummary(ctx context.Context, month string) ([]response.StockO
 
 func ReportInventoryStatus(ctx context.Context) ([]response.InventoryStatusReport, error) {
 	return db.ReportInventoryStatus(ctx)
+}
+
+func ReportCustomerReconciliationSummary(ctx context.Context, q *request.ReconciliationSummaryQuery) ([]response.CustomerReconciliationSummaryReport, int64, error) {
+	return db.ReportCustomerReconciliationSummary(ctx, q)
+}
+
+func ReportSupplierReconciliationSummary(ctx context.Context, q *request.ReconciliationSummaryQuery) ([]response.SupplierReconciliationSummaryReport, int64, error) {
+	return db.ReportSupplierReconciliationSummary(ctx, q)
+}
+
+func ReportProfit(ctx context.Context, q *request.ProfitReportQuery) (*response.ProfitReport, error) {
+	return db.ReportProfit(ctx, q)
 }
