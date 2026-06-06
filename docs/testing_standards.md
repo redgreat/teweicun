@@ -11,7 +11,7 @@
 | **数据库层测试** | 存储过程业务边界、触发器连带更新、函数逻辑正确性 | `pgTAP` / 后端集成测试脚本 | 核心业务过程 100% |
 | **后端单元测试** | `db` 层的 SQL 组装（尤其是动态查询）、`service` 层的参数校验、工具函数 | `testing`, `testify(assert/require)` | > 60% |
 | **后端 API 测试** | `handler` 层 HTTP 接口规范、鉴权拦截、输入输出格式 | `httptest`, `testify` | > 80% (核心接口 100%) |
-| **前端组件测试** | 可复用 UI 组件、自研工具函数、Pinia Store | `Vitest`, `Vue Test Utils`, `MSW`| 重点组件 > 70% |
+| **前端组件测试** | 可复用 UI 组件、自研工具函数、Svelte store | `Vitest`, `@testing-library/svelte`, `MSW`| 重点组件 > 70% |
 | **E2E 自动化测试** | 核心业务链路（如：采购申请 -> 订单 -> 质检入库 -> 发货） | `Playwright` / `Cypress` | 覆盖 P0 级核心流程 |
 
 ## 2. 数据库逻辑测试 (DB-First 核心)
@@ -103,27 +103,25 @@ func TestGetPurchaseRequest_Handler(t *testing.T) {
 对于外部依赖（甚至底层 DB 操作层），推荐使用接口抽象并利用 `uber-go/mock` (原 `gomock`) 或 `testify/mock` 进行 Mock，以达到并行快速测试的目标。
 但对 **核心业务逻辑**（包含复杂SQL和存储过程），不可简单Mock，应进行使用真实的测试数据库的**集成测试**。
 
-## 4. 前端 Vue3 测试规范
+## 4. 前端 SvelteKit 测试规范
 
 ### 4.1 单元测试 (Vitest)
 
 主要测试：
-1. 复杂的计算属性（Computed）
+1. 复杂的派生状态（`$derived`）和工具函数
 2. 公共工具库（Utils）
-3. Pinia Store 的 Action 逻辑
+3. Svelte store 的状态逻辑
 4. 基础业务组件（不依赖庞大上下文）
 
 ```typescript
 import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
-import CustomButton from '../components/CustomButton.vue'
+import { render, screen } from '@testing-library/svelte'
+import CustomButton from '../components/CustomButton.svelte'
 
 describe('CustomButton Component', () => {
-  it('正确渲染插槽内容', () => {
-    const wrapper = mount(CustomButton, {
-      slots: { default: 'Click Me' }
-    })
-    expect(wrapper.text()).toContain('Click Me')
+  it('正确渲染文本内容', () => {
+    render(CustomButton, { props: { label: 'Click Me' } })
+    expect(screen.getByText('Click Me')).toBeTruthy()
   })
 })
 ```

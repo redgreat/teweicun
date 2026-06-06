@@ -1,45 +1,52 @@
 ---
-description: 项目工作流与输出偏好约束
+description: TeWeiCun 项目工作流与 AI 编码约束
 alwaysApply: true
 ---
 
 # 项目工作流与输出规范
 
-## 语言与沟通
+## 语言与入口
 
 - 默认使用中文回复。
-- 不在项目中额外生成“总结类文档”。
+- 仓库级 AI 规则以根目录 `AGENTS.md` 为准，长期调试记忆见 `MEMORY.md`。
+- 不额外生成无用户要求的总结类文档。
+
+## 项目事实
+
+- 架构是 DB-First：核心业务逻辑、事务、状态流转、库存一致性优先放 PostgreSQL。
+- 后端是 Go + Gin + pgx/pgxpool，禁止 ORM。
+- 前端是 `frontend/` 下的 SvelteKit/Svelte 5，不是 Vue。
+- API 统一前缀 `/api/v1`，前端 API client 在 `frontend/src/lib/api/client.ts`。
 
 ## 目录约定
 
-- 所有脚本文件放在 `scripts/`。
-- 所有测试文件放在 `test/`。
-- 必要文档放在 `docs/`。
+- 脚本文件放 `scripts/`。
+- 测试文件放 `test/`。
+- 必要文档放 `docs/`，AI 工具入口文档放仓库根目录。
+- 数据库迁移放 `sql/migrations/`，不要直接改 `sql/schema.sql`。
 
-## 注释与文件头
+## 数据库与 Go 映射
 
-- 不要随意添加注释；仅在函数级或文档级有必要时添加。
-- 所有源码文件必须包含文件头，说明：
-  - 代码功能
-  - 创建时间
-  - 创建人
+- 新增 SQL 迁移沿用当前三位编号格式，例如 `016_fix_xxx.sql`。
+- 新增迁移脚本头部必须包含 `-- MIGRATION_ID: <唯一ID>` 与 `-- MIGRATION_APPLIED: pending`，用于 `scripts/migrate.sh` 防重执行。
+- 部分历史迁移可能缺少头部标识，非相关任务不要批量重写历史 SQL。
+- 数据库对象和新增列需要中文 `COMMENT`。
+- 可空列、LEFT JOIN 字段扫入 Go `string` 前，SQL 侧优先 `COALESCE(..., '')`；或使用 `*string`、`sql.NullString`、`pgtype.Text`。
+- 调库存、单据确认、退货、领退料时，重点检查存储过程和 `quantity`、`locked_quantity`、`in_transit_quantity`。
 
-## 数据库新列与 Go 映射
+## 前端调试
 
-- 可为 NULL 的列：`SELECT` 中对扫入 `string` 的字段用 `COALESCE(..., '')`，或 DTO 使用指针/Null 类型；详见根目录 `CLAUDE.md`「新增可空列与 Go 查询映射」。
-- 对数据库的改动都总结一个SQL文件放在sql/migrations文件夹里，不要动sql/schema.sql，这个文件是导出表结构备份用的
-- 数据库连接在 configs/config.yaml 里面，每次迭代数据库表结构或者数据时，直接执行就可以了
-- 每个迁移脚本头部必须包含 `-- MIGRATION_ID: <唯一ID>` 与 `-- MIGRATION_APPLIED: pending`，用于发布防重。
-- 数据库迁移统一通过 `scripts/migrate.sh` 执行；执行成功后会写入 `schema_migration_history`，并把脚本头部 `MIGRATION_APPLIED` 更新为已执行标记，后续不再重复执行。
+- 使用 Svelte 5 runes 和现有组件。
+- 列表页重置筛选并回第一页时，`DataGrid` 页码必须与父组件同步，推荐 `bind:page`。
+- 不要引入 Vue/Element Plus 写法。
 
-## 示例
+## 验证命令
 
-```text
-✅ 新增数据库初始化脚本 -> scripts/init_db.sh
-❌ 新增数据库初始化脚本 -> tools/init_db.sh
-```
-
-```text
-✅ 新增接口测试 -> test/api/user_api_test.go
-❌ 新增接口测试 -> internal/test/user_api_test.go
+```powershell
+go run cmd/server/main.go -c configs/config.dev.yaml
+make test
+make test-flow
+make lint
+cd frontend; npm run check
+cd frontend; npm run lint
 ```

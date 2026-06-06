@@ -26,7 +26,7 @@
 .
 ├── cmd/                  # 应用入口
 ├── internal/             # 后端业务代码
-├── web/                  # 前端项目
+├── frontend/             # 前端项目
 ├── sql/                  # 数据库脚本（迁移/函数/过程/视图）
 ├── scripts/              # 运维与发布脚本
 ├── configs/              # 配置文件
@@ -69,14 +69,12 @@ make check-web
 # 首次执行可能需要授权
 chmod +x scripts/*.sh
 
-# 启动开发环境
-./scripts/dev.sh up
+# Linux/macOS 一键本地联调
+bash scripts/local_dev.sh
 
-# 查看日志
-./scripts/dev.sh logs
-
-# 停止并清理
-./scripts/dev.sh down
+# Windows 可开两个终端分别启动
+go run cmd/server/main.go -c configs/config.dev.yaml
+cd frontend && npm run dev
 ```
 
 ## 发布流程（当前规范）
@@ -141,7 +139,7 @@ make release
 
 - `scripts/release.sh` / `scripts/release.ps1`：创建并推送 Git Tag
 - `scripts/redeploy.sh` / `scripts/redeploy.ps1`：服务端重部署
-- `scripts/dev.sh`：本地 Docker 开发环境管理
+- `scripts/local_dev.sh`：本地 Go + Vite 开发联调
 
 ## 参考文档
 
