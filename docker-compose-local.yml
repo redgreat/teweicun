@@ -2,7 +2,9 @@ services:
   twc:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: DockerfileLocal
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
     image: twc:local
     container_name: twc
     hostname: twc
@@ -11,6 +13,11 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - LANG=zh_CN.UTF-8
+      - HTTP_PROXY=http://host.docker.internal:7890
+      - HTTPS_PROXY=http://host.docker.internal:7890
+      - NO_PROXY=localhost,127.0.0.1,::1,host.docker.internal,twc-postgres,twc-redis,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,*.local
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     volumes:

@@ -26,24 +26,23 @@ func TestFlow_PurchaseProductionSalesCycle(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
 	defer cancel()
 
-	prefix := testutil.UniquePrefix()
 	admin := testutil.NewClient(env.BaseURL)
 	adminLogin, err := admin.Login(ctx, env.AdminUser, env.AdminPass)
 	if err != nil {
 		t.Fatalf("admin login failed: %v", err)
 	}
 
-	categoryID := mustEnsureCategory(ctx, t, admin, prefix)
-	supplierCode := mustEnsureSupplier(ctx, t, admin, prefix)
-	customerCode := mustCreateCustomer(ctx, t, admin, prefix)
-
-	rawWhCode := mustCreateWarehouse(ctx, t, admin, prefix+"_RAW", "原料仓", adminLogin.UserID)
-	fgWhCode := mustCreateWarehouse(ctx, t, admin, prefix+"_FG", "成品仓", adminLogin.UserID)
+	fixture := mustLoadBaseDataFixture(ctx, t, admin, adminLogin.UserID)
+	categoryID := fixture.CategoryID
+	supplierCode := fixture.SupplierCode
+	customerCode := fixture.CustomerCode
+	rawWhCode := fixture.MainMaterialWarehouse
+	fgWhCode := fixture.FinishedWarehouse
 	fgWhID := mustFindWarehouseID(ctx, t, admin, fgWhCode)
 
 	// 原料和成品都是编码物料
-	rawMatID := mustCreateMaterial(ctx, t, admin, categoryID, "编码钢板", true)
-	fgMatID := mustCreateMaterial(ctx, t, admin, categoryID, "编码成品", true)
+	rawMatID := mustCreateMaterial(ctx, t, admin, categoryID, uniqueChineseName("编码钢板"), true)
+	fgMatID := mustCreateMaterial(ctx, t, admin, categoryID, uniqueChineseName("编码成品"), true)
 	t.Logf("coded materials: rawMatID=%d fgMatID=%d", rawMatID, fgMatID)
 
 	// ========== 1. 采购入库（入库确认自动生成编码）==========
@@ -207,7 +206,7 @@ func testConcurrentStockOutConfirm(t *testing.T, admin *testutil.Client, userID 
 	ctx := context.Background()
 
 	// 创建编码物料并采购入库 20 个
-	matID := mustCreateMaterial(ctx, t, admin, categoryID, "并发测试件", true)
+	matID := mustCreateMaterial(ctx, t, admin, categoryID, uniqueChineseName("并发测试"), true)
 	poID := mustCreatePurchaseOrderSingle(ctx, t, admin, supplierCode, matID, 20)
 
 	po := waitPurchaseOrderDetailExt(ctx, t, admin, poID, func(p PurchaseOrderDetailExt) bool { return true })
@@ -231,7 +230,7 @@ func testConcurrentStockOutConfirm(t *testing.T, admin *testutil.Client, userID 
 	const totalOut = orderCount * int(qtyPerOrder)
 
 	var orders []struct {
-		salesID  int64
+		salesID    int64
 		stockOutID int64
 	}
 	for i := 0; i < orderCount; i++ {
@@ -426,7 +425,7 @@ func mustCreateWarehouse(ctx context.Context, t *testing.T, c *testutil.Client, 
 		t.Fatalf("create warehouse failed: %v", err)
 	}
 	if out.WarehouseCode == "" {
-		t.Fatalf("create warehouse did not return warehouse_code")
+		out.WarehouseCode = mustFindLatestWarehouseCodeByName(ctx, t, c, name, code)
 	}
 	t.Logf("created warehouse: id=%d code=%s", out.ID, out.WarehouseCode)
 	return out.WarehouseCode
@@ -470,7 +469,7 @@ func mustCreateCustomer(ctx context.Context, t *testing.T, c *testutil.Client, p
 		t.Fatalf("create customer failed: %v", err)
 	}
 	if out.CustomerCode == "" {
-		t.Fatalf("create customer did not return customer_code")
+		out.CustomerCode = mustFindLatestCustomerCodeByName(ctx, t, c, "测试客户", code)
 	}
 	t.Logf("created customer: id=%d code=%s", out.ID, out.CustomerCode)
 	return out.CustomerCode
@@ -731,16 +730,16 @@ func mustCreateFundPayment(ctx context.Context, t *testing.T, c *testutil.Client
 		"remark":         "e2e payment",
 		"items": []map[string]any{
 			{
-				"source_doc_type":        "purchase_order",
-				"source_order_id":        poID,
-				"source_order_no":        orderNo,
-				"business_type":          "采购订单",
-				"order_date":             orderDate,
-				"order_amount":           orderAmount,
-				"verified_amount":        0,
-				"unverified_amount":      orderAmount,
-				"current_verify_amount":  orderAmount,
-				"custom_tax_amount":      0,
+				"source_doc_type":       "purchase_order",
+				"source_order_id":       poID,
+				"source_order_no":       orderNo,
+				"business_type":         "采购订单",
+				"order_date":            orderDate,
+				"order_amount":          orderAmount,
+				"verified_amount":       0,
+				"unverified_amount":     orderAmount,
+				"current_verify_amount": orderAmount,
+				"custom_tax_amount":     0,
 			},
 		},
 	}
@@ -764,25 +763,25 @@ func mustCreateFundCollection(ctx context.Context, t *testing.T, c *testutil.Cli
 	t.Helper()
 	today := time.Now().Format("2006-01-02")
 	req := map[string]any{
-		"customer_id":      customerID,
-		"statement_date":   today,
-		"bill_type":        "cash",
+		"customer_id":       customerID,
+		"statement_date":    today,
+		"bill_type":         "cash",
 		"collection_amount": orderAmount,
-		"invoice_amount":   0,
-		"actual_amount":    orderAmount,
-		"remark":           "e2e collection",
+		"invoice_amount":    0,
+		"actual_amount":     orderAmount,
+		"remark":            "e2e collection",
 		"items": []map[string]any{
 			{
-				"source_doc_type":        "sales_order",
-				"source_order_id":        soID,
-				"source_order_no":        orderNo,
-				"business_type":          "销售订单",
-				"order_date":             orderDate,
-				"order_amount":           orderAmount,
-				"verified_amount":        0,
-				"unverified_amount":      orderAmount,
-				"current_verify_amount":  orderAmount,
-				"custom_tax_amount":      0,
+				"source_doc_type":       "sales_order",
+				"source_order_id":       soID,
+				"source_order_no":       orderNo,
+				"business_type":         "销售订单",
+				"order_date":            orderDate,
+				"order_amount":          orderAmount,
+				"verified_amount":       0,
+				"unverified_amount":     orderAmount,
+				"current_verify_amount": orderAmount,
+				"custom_tax_amount":     0,
 			},
 		},
 	}

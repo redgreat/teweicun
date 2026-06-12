@@ -40,3 +40,5 @@ config/config.yaml
 .trae/
 .cursor/
 logs/*
+.idea/
+test/.runtime/

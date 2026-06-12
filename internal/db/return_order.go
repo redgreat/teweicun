@@ -572,14 +572,27 @@ func UpdateSalesReturnOrder(ctx context.Context, id int64, req *request.UpdateSa
 // ConfirmReturnOrder 确认退货（调用 SP）实现库存扣减或回库
 func ConfirmReturnOrder(ctx context.Context, returnID int64, userID int64, username string) error {
 	var returnType string
-	err := database.Pool.QueryRow(ctx, `SELECT return_type FROM return_order WHERE id = $1 AND deleted_at IS NULL`, returnID).Scan(&returnType)
+	var returnStatus string
+	var stockOutID int64
+	var stockInID int64
+	err := database.Pool.QueryRow(ctx, `
+		SELECT return_type, COALESCE(return_status, 'draft'),
+		       COALESCE(stock_out_id, 0), COALESCE(stock_in_id, 0)
+		FROM return_order
+		WHERE id = $1 AND deleted_at IS NULL
+	`, returnID).Scan(&returnType, &returnStatus, &stockOutID, &stockInID)
 	if err != nil {
 		return err
 	}
 
 	query := `CALL sp_confirm_return_order($1, $2)`
 	if returnType == "purchase_return" {
+		if returnStatus == "pending_out" || stockOutID > 0 {
+			return nil
+		}
 		query = `CALL sp_submit_purchase_return($1, $2)`
+	} else if returnType == "sales_return" && (returnStatus == "confirmed" || returnStatus == "completed" || stockInID > 0) {
+		return nil
 	}
 
 	_, err = database.Pool.Exec(ctx, query, returnID, userID)

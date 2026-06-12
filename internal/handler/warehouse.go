@@ -52,7 +52,7 @@ func CreateWarehouse(c *gin.Context) {
 
 	id, code, err := service.CreateWarehouse(c.Request.Context(), &req, userID, username)
 	if err != nil {
-		response.Error(c, err)
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
 		return
 	}
 
@@ -78,7 +78,7 @@ func UpdateWarehouse(c *gin.Context) {
 
 	err = service.UpdateWarehouse(c.Request.Context(), id, &req, userID, username)
 	if err != nil {
-		response.Error(c, err)
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
 		return
 	}
 
@@ -98,7 +98,7 @@ func DeleteWarehouse(c *gin.Context) {
 
 	err = service.DeleteWarehouse(c.Request.Context(), id, userID, username)
 	if err != nil {
-		response.Error(c, err)
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
 		return
 	}
 

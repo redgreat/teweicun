@@ -33,6 +33,7 @@ type Supplier struct {
 type Warehouse struct {
 	WarehouseCode string `json:"warehouse_code"`
 	WarehouseName string `json:"warehouse_name"`
+	WarehouseType string `json:"warehouse_type"`
 	ID            int64  `json:"id"`
 }
 
@@ -87,6 +88,7 @@ type InventoryAvailable struct {
 	IsCode            bool    `json:"is_code"`
 	WarehouseCode     string  `json:"warehouse_code"`
 	Unit              string  `json:"unit"`
+	UnitCost          float64 `json:"unit_cost"`
 	AvailableQuantity float64 `json:"available_quantity"`
 }
 
@@ -162,7 +164,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
 	defer cancel()
 
-	prefix := testutil.UniquePrefix()
 	admin := testutil.NewClient(env.BaseURL)
 
 	adminLogin, err := admin.Login(ctx, env.AdminUser, env.AdminPass)
@@ -173,69 +174,18 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 
 	_ = admin.DoJSON(ctx, http.MethodGet, "/api/v1/health", nil, nil, nil)
 
-	useAdminOnly := false
-	allPermIDs, err := fetchAllPermissionIDs(ctx, admin)
-	if err != nil {
-		t.Logf("WARN: fetch permission tree failed, fallback to admin-only. err=%v", err)
-		useAdminOnly = true
-	}
+	useAdminOnly := true
+	fixture := mustLoadBaseDataFixture(ctx, t, admin, adminLogin.UserID)
+	supplierCode := fixture.SupplierCode
+	warehouseCode := fixture.MainMaterialWarehouse
+	categoryID := fixture.CategoryID
 
-	var roleAID, roleBID, roleCID int64
-	if !useAdminOnly {
-		var ok bool
-		roleAID, ok = tryCreateRole(ctx, t, admin, prefix+"_A", "RoleA_"+prefix)
-		useAdminOnly = useAdminOnly || !ok
-		roleBID, ok = tryCreateRole(ctx, t, admin, prefix+"_B", "RoleB_"+prefix)
-		useAdminOnly = useAdminOnly || !ok
-		roleCID, ok = tryCreateRole(ctx, t, admin, prefix+"_C", "RoleC_"+prefix)
-		useAdminOnly = useAdminOnly || !ok
-	}
-
-	if !useAdminOnly {
-		if err := trySetRolePerms(ctx, t, admin, roleAID, allPermIDs); err != nil {
-			t.Logf("WARN: set roleA perms failed, fallback to admin-only. err=%v", err)
-			useAdminOnly = true
-		}
-		if err := trySetRolePerms(ctx, t, admin, roleBID, allPermIDs); err != nil {
-			t.Logf("WARN: set roleB perms failed, fallback to admin-only. err=%v", err)
-			useAdminOnly = true
-		}
-		if err := trySetRolePerms(ctx, t, admin, roleCID, allPermIDs); err != nil {
-			t.Logf("WARN: set roleC perms failed, fallback to admin-only. err=%v", err)
-			useAdminOnly = true
-		}
-	}
-
-	userA, passA := prefix+"_userA", "Aa123456!"
-	userB, passB := prefix+"_userB", "Bb123456!"
-	userC, passC := prefix+"_userC", "Cc123456!"
-	if !useAdminOnly {
-		if _, ok := tryCreateUser(ctx, t, admin, userA, passA, "UserA_"+prefix, []int64{roleAID}); !ok {
-			useAdminOnly = true
-		}
-		if _, ok := tryCreateUser(ctx, t, admin, userB, passB, "UserB_"+prefix, []int64{roleBID}); !ok {
-			useAdminOnly = true
-		}
-		if _, ok := tryCreateUser(ctx, t, admin, userC, passC, "UserC_"+prefix, []int64{roleCID}); !ok {
-			useAdminOnly = true
-		}
-	}
-
-	supplierCode := mustEnsureSupplier(ctx, t, admin, prefix)
-	warehouseCode := mustEnsureWarehouse(ctx, t, admin, prefix, adminLogin.UserID)
-	categoryID := mustEnsureCategory(ctx, t, admin, prefix)
-
-	codeMatID := mustCreateMaterial(ctx, t, admin, categoryID, prefix+"_CODE_MAT", true)
-	noCodeMatID := mustCreateMaterial(ctx, t, admin, categoryID, prefix+"_NOCODE_MAT", false)
+	codeMatID := mustCreateMaterial(ctx, t, admin, categoryID, uniqueChineseName("编码钢板"), true)
+	noCodeMatID := mustCreateMaterial(ctx, t, admin, categoryID, uniqueChineseName("普通钢板"), false)
 
 	clientA := admin
 	if !useAdminOnly {
 		clientA = testutil.NewClient(env.BaseURL)
-		if _, err := clientA.Login(ctx, userA, passA); err != nil {
-			t.Logf("WARN: roleA login failed, fallback to admin-only. err=%v", err)
-			clientA = admin
-			useAdminOnly = true
-		}
 	}
 
 	poID := mustCreatePurchaseOrder(ctx, t, clientA, supplierCode, codeMatID, noCodeMatID)
@@ -256,11 +206,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	clientC := admin
 	if !useAdminOnly {
 		clientC = testutil.NewClient(env.BaseURL)
-		if _, err := clientC.Login(ctx, userC, passC); err != nil {
-			t.Logf("WARN: roleC login failed, fallback to admin-only. err=%v", err)
-			clientC = admin
-			useAdminOnly = true
-		}
 	}
 	setStockInWarehouseIfEmpty(ctx, t, clientC, po.StockInID, warehouseCode)
 	mustConfirm(ctx, t, clientC, fmt.Sprintf("/api/v1/stock-in/%d/confirm", po.StockInID))
@@ -287,11 +232,6 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	clientB := admin
 	if !useAdminOnly {
 		clientB = testutil.NewClient(env.BaseURL)
-		if _, err := clientB.Login(ctx, userB, passB); err != nil {
-			t.Logf("WARN: roleB login failed, fallback to admin-only. err=%v", err)
-			clientB = admin
-			useAdminOnly = true
-		}
 	}
 
 	codeInv := mustPickInventoryAvailable(ctx, t, clientB, warehouseCode, codeMatID, true, 5)

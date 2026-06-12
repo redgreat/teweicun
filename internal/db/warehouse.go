@@ -16,6 +16,23 @@ import (
 	"github.com/redgreat/teweicun/pkg/database"
 )
 
+var allowedWarehouseTypes = map[string]struct{}{
+	"main_material": {},
+	"finished":      {},
+	"welding":       {},
+	"auxiliary":     {},
+}
+
+func validateWarehouseScope(name, warehouseType string) error {
+	if strings.TrimSpace(name) == "" {
+		return fmt.Errorf("仓库名称不能为空")
+	}
+	if _, ok := allowedWarehouseTypes[strings.TrimSpace(warehouseType)]; !ok {
+		return fmt.Errorf("仓库类型只允许为：main_material、finished、welding、auxiliary")
+	}
+	return nil
+}
+
 // ListWarehouses 分页查询仓库
 func ListWarehouses(ctx context.Context, q *request.WarehouseQuery) ([]response.WarehouseResp, int64, error) {
 	where := []string{"1=1"}
@@ -80,11 +97,29 @@ func ListWarehouses(ctx context.Context, q *request.WarehouseQuery) ([]response.
 
 // CreateWarehouse 创建仓库
 func CreateWarehouse(ctx context.Context, req *request.CreateWarehouseReq, userID int64, username string) (int64, string, error) {
+	if err := validateWarehouseScope(req.WarehouseName, req.WarehouseType); err != nil {
+		return 0, "", err
+	}
+
 	tx, err := database.Pool.Begin(ctx)
 	if err != nil {
 		return 0, "", err
 	}
 	defer tx.Rollback(ctx)
+
+	var exists int64
+	err = tx.QueryRow(ctx, `
+		SELECT count(1)
+		FROM warehouse
+		WHERE deleted_at IS NULL
+		  AND (warehouse_name = $1 OR warehouse_type = $2)
+	`, req.WarehouseName, req.WarehouseType).Scan(&exists)
+	if err != nil {
+		return 0, "", err
+	}
+	if exists > 0 {
+		return 0, "", fmt.Errorf("仓库名称或类型已存在")
+	}
 
 	// 自动生成仓库编码
 	var warehouseCode string
@@ -117,11 +152,30 @@ func CreateWarehouse(ctx context.Context, req *request.CreateWarehouseReq, userI
 
 // UpdateWarehouse 更新仓库
 func UpdateWarehouse(ctx context.Context, id int64, req *request.UpdateWarehouseReq, userID int64, username string) error {
+	if err := validateWarehouseScope(req.WarehouseName, req.WarehouseType); err != nil {
+		return err
+	}
+
 	tx, err := database.Pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
+
+	var exists int64
+	err = tx.QueryRow(ctx, `
+		SELECT count(1)
+		FROM warehouse
+		WHERE deleted_at IS NULL
+		  AND id <> $1
+		  AND (warehouse_name = $2 OR warehouse_type = $3)
+	`, id, req.WarehouseName, req.WarehouseType).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists > 0 {
+		return fmt.Errorf("仓库名称或类型已存在")
+	}
 
 	// 禁用验证：检查是否有库存记录
 	if req.Status == "disabled" {

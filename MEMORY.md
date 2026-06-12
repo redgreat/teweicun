@@ -34,3 +34,10 @@
 - 核心业务流：跑 `make test-flow`。
 - 前端改动：跑 `cd frontend; npm run check`，必要时再 `npm run lint`。
 - SQL 改动：先本地执行迁移，再跑相关接口/流程测试。
+
+## 开发环境
+
+- Node.js：通过 nvm v0.40.3 管理，默认版本 22.22.3（匹配项目 .nvmrc 中的 22）。nvm 配置已写入 `~/.zshrc`。
+- Go：通过 goenv 管理，全局版本 1.26.4（项目 go.mod 要求 1.25+）。goenv 配置已写入 `~/.zshrc`。
+- 终端代理：已配置 `proxy_on`/`proxy_off` 函数（Clash 7890/7891 端口）。
+- 操作系统 Wayland，剪贴板使用 wl-clipboard (wl-copy/wl-paste)，tmux 配置已适配。

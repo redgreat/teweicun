@@ -135,7 +135,7 @@ func ListInventorySummary(ctx context.Context, q *request.InventoryQuery) ([]res
 }
 
 func ListInventoryAvailable(ctx context.Context, q *request.InventoryAvailableQuery) ([]response.InventoryAvailableResp, int64, error) {
-	where := []string{"i.quantity > 0"}
+	where := []string{"i.quantity > 0", "m.deleted_at IS NULL", "w.deleted_at IS NULL"}
 	var args []interface{}
 	argID := 1
 

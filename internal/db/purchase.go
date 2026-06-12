@@ -442,7 +442,26 @@ func DeletePurchaseOrder(ctx context.Context, id int64) error {
 }
 
 func ConfirmPurchaseOrder(ctx context.Context, orderID, userID int64) error {
-	_, err := database.Pool.Exec(ctx, `CALL sp_confirm_purchase_order($1, $2)`, orderID, userID)
+	var status string
+	err := database.Pool.QueryRow(ctx, `
+		SELECT COALESCE(order_status, 'draft')
+		FROM purchase_order
+		WHERE id = $1 AND deleted_at IS NULL
+	`, orderID).Scan(&status)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return errcode.ErrNotFound
+		}
+		return err
+	}
+	if status == "ordered" {
+		return nil
+	}
+	if status != "draft" {
+		return errcode.NewAppError(errcode.ErrForbidden.Code, fmt.Sprintf("采购订单当前状态[%s]不允许确认", status), errcode.ErrForbidden.HTTPCode)
+	}
+
+	_, err = database.Pool.Exec(ctx, `CALL sp_confirm_purchase_order($1, $2)`, orderID, userID)
 	return err
 }
 

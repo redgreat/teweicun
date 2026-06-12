@@ -6,12 +6,13 @@
 # =================================================================
 
 COMPOSE_FILE="docker-compose-local.yml"
+DOCKER_BIN="${DOCKER_BIN:-docker}"
 
 function full_deploy() {
     echo "================================================"
     echo " 1. 构建业务镜像（单镜像）"
     echo "================================================"
-    docker compose -f $COMPOSE_FILE build twc
+    $DOCKER_BIN compose -f $COMPOSE_FILE build twc
     if [ $? -ne 0 ]; then
         echo "❌ 镜像构建失败，退出！"
         exit 1
@@ -21,12 +22,12 @@ function full_deploy() {
     echo " 2. 仅停止并删除业务容器"
     echo "================================================"
 
-    docker compose -f $COMPOSE_FILE rm -f -s twc
+    $DOCKER_BIN compose -f $COMPOSE_FILE rm -f -s twc
 
     echo "================================================"
     echo " 3. 启动所有容器（不重复构建）"
     echo "================================================"
-    docker compose -f $COMPOSE_FILE up -d --no-build
+    $DOCKER_BIN compose -f $COMPOSE_FILE up -d --no-build
     if [ $? -ne 0 ]; then
         echo "❌ 容器启动失败，退出！"
         exit 1
@@ -46,10 +47,10 @@ COMMAND=$1
 case $COMMAND in
   "down")
     # 只有显式执行 down 时才会彻底摧毁基座
-    docker compose -f $COMPOSE_FILE down
+    $DOCKER_BIN compose -f $COMPOSE_FILE down
     ;;
   "logs")
-    docker compose -f $COMPOSE_FILE logs -f
+    $DOCKER_BIN compose -f $COMPOSE_FILE logs -f
     ;;
   *)
     full_deploy
