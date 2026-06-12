@@ -6,6 +6,7 @@
 
 <script lang="ts">
 	import DataGrid from '$lib/components/DataGrid.svelte';
+	import CopyableNo from '$lib/components/CopyableNo.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
@@ -340,13 +341,7 @@
 		{/snippet}
 		{#snippet cellRender(key, value, row)}
 			{#if key === 'stock_in_no'}
-				<a
-					href={`/stock/in/${row.id}`}
-					class="link link-primary block min-w-0 truncate font-mono no-underline hover:underline"
-					title="查看详情"
-				>
-					{value || '-'}
-				</a>
+				<CopyableNo value={value} href={`/stock/in/${row.id}`} title="查看详情" />
 			{:else if key === 'warehouse_name'}
 				<span class="block min-w-0 truncate" title={value || ''}>{value || '-'}</span>
 			{:else if key === 'stock_in_date'}
@@ -354,13 +349,7 @@
 			{:else if key === 'business_doc_no'}
 				{@const href = getBusinessDocHref(row)}
 				{#if href && value}
-					<a
-						{href}
-						class="link link-primary block min-w-0 truncate font-mono no-underline hover:underline"
-						title="查看业务单详情"
-					>
-						{value}
-					</a>
+					<CopyableNo value={value} {href} title="查看业务单详情" />
 				{:else}
 					<span class="text-base-content/30">-</span>
 				{/if}

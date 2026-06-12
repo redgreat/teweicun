@@ -44,10 +44,12 @@ type Material struct {
 }
 
 type PurchaseOrderDetail struct {
-	ID        int64  `json:"id"`
-	StockInID int64  `json:"stock_in_id"`
-	OrderNo   string `json:"order_no"`
-	Items     []struct {
+	ID          int64  `json:"id"`
+	StockInID   int64  `json:"stock_in_id"`
+	StockInNo   string `json:"stock_in_no"`
+	OrderNo     string `json:"order_no"`
+	OrderStatus string `json:"order_status"`
+	Items       []struct {
 		ID         int64   `json:"id"`
 		MaterialID int64   `json:"material_id"`
 		Quantity   float64 `json:"quantity"`
@@ -209,6 +211,7 @@ func TestFlow_PurchaseToReversalAndReturn(t *testing.T) {
 	}
 	setStockInWarehouseIfEmpty(ctx, t, clientC, po.StockInID, warehouseCode)
 	mustConfirm(ctx, t, clientC, fmt.Sprintf("/api/v1/stock-in/%d/confirm", po.StockInID))
+	mustAssertPurchaseReceivedWithStockIn(ctx, t, clientC, poID, po.StockInID)
 
 	var stockIn StockInDetail
 	if err := clientC.DoJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/stock-in/%d", po.StockInID), nil, nil, &stockIn); err != nil {
@@ -462,6 +465,50 @@ func waitFindStockInIDByPurchaseOrderID(ctx context.Context, c *testutil.Client,
 		time.Sleep(1 * time.Second)
 	}
 	return 0, false
+}
+
+func mustAssertPurchaseReceivedWithStockIn(ctx context.Context, t *testing.T, c *testutil.Client, purchaseOrderID, stockInID int64) {
+	t.Helper()
+	var detail PurchaseOrderDetail
+	if err := c.DoJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/purchase/orders/%d", purchaseOrderID), nil, nil, &detail); err != nil {
+		t.Fatalf("get purchase order after stock-in confirm failed: %v", err)
+	}
+	if detail.OrderNo == "" {
+		t.Fatalf("purchase detail missing order_no id=%d", purchaseOrderID)
+	}
+	if detail.StockInID != stockInID || detail.StockInID <= 0 || detail.StockInNo == "" {
+		t.Fatalf("purchase detail stock-in mismatch: got id=%d no=%s want id=%d", detail.StockInID, detail.StockInNo, stockInID)
+	}
+	if detail.OrderStatus != "full_received" {
+		t.Fatalf("purchase status after full stock-in mismatch: got=%s want=full_received order=%s stockIn=%s", detail.OrderStatus, detail.OrderNo, detail.StockInNo)
+	}
+
+	q := url.Values{}
+	q.Set("page", "1")
+	q.Set("page_size", "20")
+	q.Set("order_no", detail.OrderNo)
+	var list []struct {
+		ID          int64  `json:"id"`
+		OrderNo     string `json:"order_no"`
+		OrderStatus string `json:"order_status"`
+		StockInID   int64  `json:"stock_in_id"`
+		StockInNo   string `json:"stock_in_no"`
+	}
+	if err := c.DoPage(ctx, http.MethodGet, "/api/v1/purchase/orders", q, &list, nil); err != nil {
+		t.Fatalf("list purchase order after stock-in confirm failed: %v", err)
+	}
+	for _, row := range list {
+		if row.ID == purchaseOrderID {
+			if row.StockInID != stockInID || row.StockInNo == "" {
+				t.Fatalf("purchase list stock-in mismatch: got id=%d no=%s want id=%d order=%s", row.StockInID, row.StockInNo, stockInID, detail.OrderNo)
+			}
+			if row.OrderStatus != "full_received" {
+				t.Fatalf("purchase list status mismatch: got=%s want=full_received order=%s", row.OrderStatus, detail.OrderNo)
+			}
+			return
+		}
+	}
+	t.Fatalf("purchase list missing order id=%d order_no=%s", purchaseOrderID, detail.OrderNo)
 }
 
 func dedup(in []int64) []int64 {

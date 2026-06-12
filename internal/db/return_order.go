@@ -69,7 +69,12 @@ func ListReturnOrders(ctx context.Context, q *request.ReturnOrderQuery) ([]respo
 	whereClause := strings.Join(where, " AND ")
 
 	var total int64
-	countQuery := fmt.Sprintf("SELECT count(*) FROM return_order ro WHERE %s", whereClause)
+	countQuery := fmt.Sprintf(`
+		SELECT count(*)
+		FROM return_order ro
+		LEFT JOIN customer c ON c.customer_code = ro.customer_code AND c.deleted_at IS NULL
+		WHERE %s
+	`, whereClause)
 	if err := database.Pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}

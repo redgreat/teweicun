@@ -5,6 +5,7 @@
 -->
 <script lang="ts">
 	import DataGrid from '$lib/components/DataGrid.svelte';
+	import CopyableNo from '$lib/components/CopyableNo.svelte';
 	import api from '$lib/api/client';
 	import { onMount } from 'svelte';
 	import { FileText } from 'lucide-svelte';
@@ -20,7 +21,7 @@
 	let customerOptions = $state<any[]>([]);
 
 	const columns = [
-		{ key: 'statement_no', label: '对账单号', class: 'font-mono text-primary' },
+		{ key: 'statement_no', label: '对账单号', class: 'font-mono text-primary', width: '11rem' },
 		{ key: 'customer_name', label: '客户名称' },
 		{ key: 'statement_date', label: '单据日期' },
 		{ key: 'bill_type', label: '票款类型' },
@@ -126,6 +127,8 @@
 				<span class="badge badge-md {value === 'completed' ? 'badge-success' : 'badge-ghost'}">
 					{value === 'completed' ? '已完成' : '草稿'}
 				</span>
+			{:else if key === 'statement_no'}
+				<CopyableNo value={value} truncate={false} />
 			{:else}
 				{value || '-'}
 			{/if}

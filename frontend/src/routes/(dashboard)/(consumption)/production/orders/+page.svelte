@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import DataGrid from '$lib/components/DataGrid.svelte';
+	import CopyableNo from '$lib/components/CopyableNo.svelte';
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { formatDateInCn } from '$lib/datetime';
@@ -124,31 +125,16 @@
 
 		{#snippet cellRender(key, value, row)}
 			{#if key === 'production_no'}
-				<button
-					class="link link-primary font-mono no-underline hover:underline"
-					onclick={() => navigateToDetail(row.id)}
-				>
-					{value || '-'}
-				</button>
+				<CopyableNo value={value} onOpen={() => navigateToDetail(row.id)} />
 			{:else if key === 'consumption_order_no'}
 				{#if row.consumption_order_id}
-					<a
-						href={`/consumption/orders/${row.consumption_order_id}`}
-						class="link link-primary font-mono no-underline hover:underline"
-					>
-						{value || '-'}
-					</a>
+					<CopyableNo value={value} href={`/consumption/orders/${row.consumption_order_id}`} />
 				{:else}
 					<span class="text-base-content/30">-</span>
 				{/if}
 			{:else if key === 'stock_in_no'}
 				{#if row.stock_in_id}
-					<a
-						href={`/stock/in/${row.stock_in_id}`}
-						class="link link-primary font-mono no-underline hover:underline"
-					>
-						{value || '-'}
-					</a>
+					<CopyableNo value={value} href={`/stock/in/${row.stock_in_id}`} />
 				{:else}
 					<span class="text-base-content/30">-</span>
 				{/if}
@@ -168,4 +154,3 @@
 		{/snippet}
 	</DataGrid>
 </div>
-

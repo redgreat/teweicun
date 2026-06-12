@@ -19,7 +19,6 @@
 
 # 前端目录中的无关/可再生成内容
 frontend/node_modules/
-frontend/build/
 frontend/.svelte-kit/
 frontend/dist/
 frontend/coverage/

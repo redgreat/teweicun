@@ -277,15 +277,15 @@ func ExportInventoryMaterialLedger(c *gin.Context) {
 		},
 	})
 
-	_ = f.MergeCell(sheet, "A1", "K1")
+	_ = f.MergeCell(sheet, "A1", "M1")
 	_ = f.SetCellValue(sheet, "A1", "库存台账报表")
-	_ = f.SetCellStyle(sheet, "A1", "K1", titleStyle)
+	_ = f.SetCellStyle(sheet, "A1", "M1", titleStyle)
 
-	_ = f.MergeCell(sheet, "A2", "K2")
+	_ = f.MergeCell(sheet, "A2", "M2")
 	_ = f.SetCellValue(sheet, "A2",
 		fmt.Sprintf("导出时间：%s  |  筛选：物料[%s] 仓库[%s] 价格区间[%.2f - %.2f]",
 			time.Now().Format("2006-01-02 15:04:05"), q.MaterialName, q.WarehouseName, q.PriceMin, q.PriceMax))
-	_ = f.SetCellStyle(sheet, "A2", "K2", subTitleStyle)
+	_ = f.SetCellStyle(sheet, "A2", "M2", subTitleStyle)
 
 	_ = f.MergeCell(sheet, "A3", "B3")
 	_ = f.SetCellValue(sheet, "A3", "在库总金额")
@@ -308,12 +308,12 @@ func ExportInventoryMaterialLedger(c *gin.Context) {
 	_ = f.SetCellValue(sheet, "K3", fmt.Sprintf("总锁定数量：%.3f", stats.TotalLockedQty))
 	_ = f.SetCellStyle(sheet, "K3", "K3", summaryQtyValueStyle)
 
-	headers := []string{"物料名称", "所在仓库", "是否编码", "库存数量", "单价", "总价", "锁定数量", "库存批次数", "属性", "编码"}
+	headers := []string{"物料名称", "所在仓库", "是否编码", "账面库存", "锁定数量", "在途数量", "编码备货数", "可用数量", "单价", "总价", "库存批次数", "属性", "编码"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 5)
 		_ = f.SetCellValue(sheet, cell, h)
 	}
-	_ = f.SetCellStyle(sheet, "A5", "K5", headerStyle)
+	_ = f.SetCellStyle(sheet, "A5", "M5", headerStyle)
 
 	for idx, r := range rows {
 		rowNo := idx + 6
@@ -321,10 +321,13 @@ func ExportInventoryMaterialLedger(c *gin.Context) {
 			r.MaterialName,
 			r.WarehouseName,
 			map[bool]string{true: "有编码", false: "无编码"}[r.IsCode],
+			r.BookQuantity,
+			r.LockedQuantity,
+			r.InTransitQuantity,
+			r.SerialReservedQuantity,
 			r.Quantity,
 			r.UnitCost,
 			r.TotalAmount,
-			r.LockedQuantity,
 			r.InventoryCount,
 			"查看属性",
 			map[bool]string{true: "查看编码", false: "-"}[r.IsCode],
@@ -334,19 +337,19 @@ func ExportInventoryMaterialLedger(c *gin.Context) {
 			_ = f.SetCellValue(sheet, cell, v)
 		}
 		_ = f.SetCellStyle(sheet, fmt.Sprintf("A%d", rowNo), fmt.Sprintf("C%d", rowNo), bodyStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("D%d", rowNo), fmt.Sprintf("D%d", rowNo), numberStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("E%d", rowNo), fmt.Sprintf("F%d", rowNo), moneyStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("G%d", rowNo), fmt.Sprintf("G%d", rowNo), numberStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("H%d", rowNo), fmt.Sprintf("H%d", rowNo), countStyle)
-		_ = f.SetCellStyle(sheet, fmt.Sprintf("I%d", rowNo), fmt.Sprintf("J%d", rowNo), bodyStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("D%d", rowNo), fmt.Sprintf("H%d", rowNo), numberStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("I%d", rowNo), fmt.Sprintf("J%d", rowNo), moneyStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("K%d", rowNo), fmt.Sprintf("K%d", rowNo), countStyle)
+		_ = f.SetCellStyle(sheet, fmt.Sprintf("L%d", rowNo), fmt.Sprintf("M%d", rowNo), bodyStyle)
 	}
 
 	_ = f.SetColWidth(sheet, "A", "A", 30)
 	_ = f.SetColWidth(sheet, "B", "B", 14)
 	_ = f.SetColWidth(sheet, "C", "C", 10)
-	_ = f.SetColWidth(sheet, "D", "G", 12)
-	_ = f.SetColWidth(sheet, "H", "H", 12)
-	_ = f.SetColWidth(sheet, "I", "J", 10)
+	_ = f.SetColWidth(sheet, "D", "H", 12)
+	_ = f.SetColWidth(sheet, "I", "J", 12)
+	_ = f.SetColWidth(sheet, "K", "K", 12)
+	_ = f.SetColWidth(sheet, "L", "M", 10)
 	_ = f.SetRowHeight(sheet, 1, 30)
 	_ = f.SetRowHeight(sheet, 2, 22)
 	_ = f.SetRowHeight(sheet, 3, 22)

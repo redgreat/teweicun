@@ -35,20 +35,20 @@ type InventorySummaryResp struct {
 }
 
 type InventoryAvailableResp struct {
-	InventoryID       int64    `json:"inventory_id"`
-	MaterialID        int64    `json:"material_id"`
-	MaterialCode      string   `json:"material_code"`
-	MaterialName      string   `json:"material_name"`
-	IsCode            bool     `json:"is_code"`
-	WarehouseID       int64    `json:"warehouse_id"`
-	WarehouseCode     string   `json:"warehouse_code"`
-	WarehouseName     string   `json:"warehouse_name"`
-	Unit              string   `json:"unit"`
-	UnitCost          float64  `json:"unit_cost"`
-	Quantity          float64  `json:"quantity"`
-	LockedQuantity    float64  `json:"locked_quantity"`
-	InTransitQuantity float64  `json:"in_transit_quantity"`
-	AvailableQuantity float64  `json:"available_quantity"`
+	InventoryID       int64   `json:"inventory_id"`
+	MaterialID        int64   `json:"material_id"`
+	MaterialCode      string  `json:"material_code"`
+	MaterialName      string  `json:"material_name"`
+	IsCode            bool    `json:"is_code"`
+	WarehouseID       int64   `json:"warehouse_id"`
+	WarehouseCode     string  `json:"warehouse_code"`
+	WarehouseName     string  `json:"warehouse_name"`
+	Unit              string  `json:"unit"`
+	UnitCost          float64 `json:"unit_cost"`
+	Quantity          float64 `json:"quantity"`
+	LockedQuantity    float64 `json:"locked_quantity"`
+	InTransitQuantity float64 `json:"in_transit_quantity"`
+	AvailableQuantity float64 `json:"available_quantity"`
 }
 
 // InventoryIssuedResp 查询“已出库(已领用)”可退回库存（按库存批次聚合）
@@ -70,17 +70,20 @@ type InventoryIssuedResp struct {
 }
 
 type InventoryMaterialLedgerResp struct {
-	MaterialID       int64   `json:"material_id"`
-	MaterialName     string  `json:"material_name"`
-	WarehouseID      int64   `json:"warehouse_id"`
-	WarehouseName    string  `json:"warehouse_name"`
-	IsCode           bool    `json:"is_code"`
-	Quantity         float64 `json:"quantity"`
-	UnitCost         float64 `json:"unit_cost"`
-	TotalAmount      float64 `json:"total_amount"`
-	LockedQuantity   float64 `json:"locked_quantity"`
-	InventoryCount   int64   `json:"inventory_count"`
-	HasCustomAttrs   bool    `json:"has_custom_attrs"`
+	MaterialID             int64   `json:"material_id"`
+	MaterialName           string  `json:"material_name"`
+	WarehouseID            int64   `json:"warehouse_id"`
+	WarehouseName          string  `json:"warehouse_name"`
+	IsCode                 bool    `json:"is_code"`
+	BookQuantity           float64 `json:"book_quantity"`
+	Quantity               float64 `json:"quantity"`
+	UnitCost               float64 `json:"unit_cost"`
+	TotalAmount            float64 `json:"total_amount"`
+	LockedQuantity         float64 `json:"locked_quantity"`
+	InTransitQuantity      float64 `json:"in_transit_quantity"`
+	SerialReservedQuantity float64 `json:"serial_reserved_quantity"`
+	InventoryCount         int64   `json:"inventory_count"`
+	HasCustomAttrs         bool    `json:"has_custom_attrs"`
 }
 
 type InventoryMaterialLedgerStatsResp struct {
@@ -91,7 +94,9 @@ type InventoryMaterialLedgerStatsResp struct {
 }
 
 type InventoryMaterialLedgerSerialResp struct {
-	SerialCode string `json:"serial_code"`
-	Status     string `json:"status"`
-	StatusName string `json:"status_name"`
+	SerialCode        string `json:"serial_code"`
+	Status            string `json:"status"`
+	StatusName        string `json:"status_name"`
+	DisplayStatus     string `json:"display_status"`
+	DisplayStatusName string `json:"display_status_name"`
 }

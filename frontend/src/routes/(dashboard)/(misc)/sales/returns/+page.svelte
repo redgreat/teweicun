@@ -6,6 +6,7 @@
 
 <script lang="ts">
 	import DataGrid from '$lib/components/DataGrid.svelte';
+	import CopyableNo from '$lib/components/CopyableNo.svelte';
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
@@ -30,11 +31,12 @@
 	});
 
 	const columns = [
-		{ key: 'return_no', label: '退货单号', class: 'font-mono text-primary', width: '15%' },
-		{ key: 'customer_name', label: '客户名称', width: '16%' },
-		{ key: 'warehouse_name', label: '入库仓库', width: '14%' },
-		{ key: 'return_date', label: '退货日期', class: 'text-center', width: '12%' },
-		{ key: 'total_amount', label: '退货金额', class: 'text-right pr-4', width: '14%' },
+		{ key: 'return_no', label: '退货单号', class: 'font-mono text-primary', width: '14%' },
+		{ key: 'customer_name', label: '客户名称', width: '15%' },
+		{ key: 'stock_in_no', label: '入库单号', class: 'font-mono', width: '14%' },
+		{ key: 'warehouse_name', label: '入库仓库', width: '13%' },
+		{ key: 'return_date', label: '退货日期', class: 'text-center', width: '11%' },
+		{ key: 'total_amount', label: '退货金额', class: 'text-right pr-4', width: '13%' },
 		{ key: 'status', label: '状态', class: 'text-center', width: '10%' }
 	];
 
@@ -178,17 +180,18 @@
 
 		{#snippet cellRender(key, value, row)}
 			{#if key === 'return_no'}
-				<a
-					href={`/sales/returns/${row.id}`}
-					class="link link-primary font-mono no-underline hover:underline"
-				>
-					{value || '-'}
-				</a>
+				<CopyableNo value={value} href={`/sales/returns/${row.id}`} />
 			{:else if key === 'status'}
 				{@const style = getStatusStyle(value, 'sales_return')}
 				<span class="badge badge-md whitespace-nowrap {style.class}">{style.label}</span>
 			{:else if key === 'total_amount'}
 				<span class="text-success font-semibold">{formatMoney(value)}</span>
+			{:else if key === 'stock_in_no'}
+				{#if row.stock_in_id && value}
+					<CopyableNo value={value} href={`/stock/in/${row.stock_in_id}`} title="查看关联入库单" />
+				{:else}
+					<span>-</span>
+				{/if}
 			{:else if key === 'return_date'}
 				<span class="whitespace-nowrap">{formatDate(value)}</span>
 			{:else}

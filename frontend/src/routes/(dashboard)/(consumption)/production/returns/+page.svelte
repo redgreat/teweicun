@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import DataGrid from '$lib/components/DataGrid.svelte';
+	import CopyableNo from '$lib/components/CopyableNo.svelte';
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { formatDateInCn } from '$lib/datetime';
@@ -118,14 +119,9 @@
 
 		{#snippet cellRender(key, value, row)}
 			{#if key === 'return_no'}
-				<button
-					class="link link-primary font-mono no-underline hover:underline"
-					onclick={() => navigateToDetail(row.id)}
-				>
-					{value || '-'}
-				</button>
+				<CopyableNo value={value} onOpen={() => navigateToDetail(row.id)} />
 			{:else if key === 'production_no'}
-				<span class="font-mono">{value || '-'}</span>
+				<CopyableNo value={value} />
 			{:else if key === 'returned_quantity'}
 				{Number(value || 0).toFixed(3)}
 			{:else if key === 'created_at'}
@@ -136,4 +132,3 @@
 		{/snippet}
 	</DataGrid>
 </div>
-

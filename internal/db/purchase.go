@@ -69,6 +69,19 @@ func ListPurchaseOrders(ctx context.Context, q *request.PurchaseOrderQuery) ([]r
 		args = append(args, q.SupplierCode)
 		argID++
 	}
+	if strings.TrimSpace(q.SupplierKeyword) != "" {
+		where = append(where, fmt.Sprintf(`(
+			po.supplier_code ILIKE $%d OR EXISTS (
+				SELECT 1
+				FROM supplier s_kw
+				WHERE s_kw.supplier_code = po.supplier_code
+				  AND s_kw.deleted_at IS NULL
+				  AND s_kw.supplier_name ILIKE $%d
+			)
+		)`, argID, argID))
+		args = append(args, "%"+strings.TrimSpace(q.SupplierKeyword)+"%")
+		argID++
+	}
 	if q.OrderStatus != "" {
 		where = append(where, fmt.Sprintf("po.order_status = $%d", argID))
 		args = append(args, q.OrderStatus)

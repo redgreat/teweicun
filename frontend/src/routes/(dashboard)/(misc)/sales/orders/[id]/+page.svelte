@@ -118,15 +118,15 @@
 						<CircleCheckBig size={16} /> 提交订单
 					</button>
 				{/if}
+				{#if detail.stock_out_id && detail.stock_out_no}
+					<a
+						href="/stock/out/{detail.stock_out_id}"
+						class="btn btn-sm btn-outline gap-1"
+					>
+						<Truck size={14} /> {detail.stock_out_no}
+					</a>
+				{/if}
 				{#if detail.order_status === 'confirmed' || detail.order_status === 'preparing'}
-					{#if detail.stock_out_id && detail.stock_out_no}
-						<a
-							href="/stock/out/{detail.stock_out_id}"
-							class="btn btn-sm btn-outline gap-1"
-						>
-							<Truck size={14} /> {detail.stock_out_no}
-						</a>
-					{/if}
 					<button
 						class="btn btn-sm btn-primary btn-outline gap-1"
 						onclick={() => (showEdit = true)}
@@ -213,6 +213,21 @@
 					<div class="text-success mt-1 font-mono text-base font-semibold">
 						¥{formatMoney(detail.total_amount)}
 					</div>
+				</div>
+				<div class="bg-base-200/40 border-base-300 rounded-xl border p-4">
+					<div class="text-base-content/55 flex items-center gap-1 text-sm">
+						<Truck size={16} /> 出库单号
+					</div>
+					{#if detail.stock_out_id && detail.stock_out_no}
+						<a
+							class="link link-primary mt-1 block font-mono text-base font-medium no-underline hover:underline"
+							href="/stock/out/{detail.stock_out_id}"
+						>
+							{detail.stock_out_no}
+						</a>
+					{:else}
+						<div class="mt-1 text-base">-</div>
+					{/if}
 				</div>
 				<div class="bg-base-200/40 border-base-300 rounded-xl border p-4 lg:col-span-2">
 					<div class="text-base-content/55 text-sm">收货地址</div>

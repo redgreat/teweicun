@@ -44,7 +44,21 @@
 		{ key: 'material_name', label: '物料名称', width: '240px' },
 		{ key: 'warehouse_name', label: '所在仓库', width: '140px' },
 		{ key: 'is_code', label: '是否编码', width: '100px' },
-		{ key: 'quantity', label: '库存数量', width: '110px', class: 'text-right font-mono' },
+		{ key: 'book_quantity', label: '账面库存', width: '110px', class: 'text-right font-mono' },
+		{ key: 'locked_quantity', label: '锁定数量', width: '110px', class: 'text-right font-mono' },
+		{
+			key: 'in_transit_quantity',
+			label: '在途数量',
+			width: '110px',
+			class: 'text-right font-mono'
+		},
+		{
+			key: 'serial_reserved_quantity',
+			label: '编码备货数',
+			width: '120px',
+			class: 'text-right font-mono'
+		},
+		{ key: 'quantity', label: '可用数量', width: '110px', class: 'text-right font-mono' },
 		{ key: 'unit_cost', label: '单价', width: '110px', class: 'text-right font-mono' },
 		{
 			key: 'total_amount',
@@ -129,6 +143,8 @@
 
 	function serialStatusBadgeClass(status: string) {
 		const s = String(status || '').toLowerCase();
+		if (s === 'stock_out_reserved') return 'badge-warning';
+		if (s === 'stock_in_reserved') return 'badge-info';
 		if (s === 'in_stock') return 'badge-success';
 		if (s === 'issued') return 'badge-warning';
 		if (s === 'returned') return 'badge-info';
@@ -137,7 +153,10 @@
 	}
 
 	function serialStatusLabel(row: any) {
-		const s = String(row?.status || '').toLowerCase();
+		const s = String(row?.display_status || row?.status || '').toLowerCase();
+		if (row?.display_status_name) return row.display_status_name;
+		if (s === 'stock_out_reserved') return '出库备货中';
+		if (s === 'stock_in_reserved') return '退料备货中';
 		if (s === 'in_stock') return '在库';
 		if (s === 'issued') return '已领用';
 		if (s === 'returned') return '已退回';
@@ -252,7 +271,12 @@
 				<span class="badge badge-sm {row.is_code ? 'badge-info' : 'badge-ghost'}">
 					{row.is_code ? '有编码' : '无编码'}
 				</span>
-			{:else if key === 'quantity'}
+			{:else if
+				key === 'book_quantity' ||
+				key === 'locked_quantity' ||
+				key === 'in_transit_quantity' ||
+				key === 'serial_reserved_quantity' ||
+				key === 'quantity'}
 				{fmtQty(value)}
 			{:else if key === 'unit_cost' || key === 'total_amount'}
 				{fmtMoney(value)}
@@ -319,7 +343,7 @@
 					<div class="overflow-x-auto">
 						<table class="table-zebra table w-full text-sm">
 							<thead>
-								<tr><th>编码</th><th>在库状态</th></tr>
+								<tr><th>编码</th><th>编码状态</th></tr>
 							</thead>
 							<tbody>
 								{#each serialModal.rows as r}
@@ -327,7 +351,9 @@
 										<td class="font-mono">{r.serial_code}</td>
 										<td>
 											<span
-												class="badge badge-sm whitespace-nowrap {serialStatusBadgeClass(r.status)}"
+												class="badge badge-sm whitespace-nowrap {serialStatusBadgeClass(
+													r.display_status || r.status
+												)}"
 											>
 												{serialStatusLabel(r)}
 											</span>

@@ -129,15 +129,15 @@
 						<Trash2 size={16} /> 删除
 					</button>
 				{/if}
+				{#if detail.stock_in_id && detail.stock_in_no}
+					<a
+						href="/stock/in/{detail.stock_in_id}"
+						class="btn btn-sm btn-outline gap-1"
+					>
+						<PackageOpen size={14} /> {detail.stock_in_no}
+					</a>
+				{/if}
 				{#if detail.status === 'confirmed'}
-					{#if detail.stock_in_id && detail.stock_in_no}
-						<a
-							href="/stock/in/{detail.stock_in_id}"
-							class="btn btn-sm btn-outline gap-1"
-						>
-							<PackageOpen size={14} /> {detail.stock_in_no}
-						</a>
-					{/if}
 					<button
 						class="btn btn-sm btn-primary btn-outline gap-1"
 						onclick={() => (showEdit = true)}
@@ -204,6 +204,21 @@
 					<div class="text-success mt-1 font-mono text-base font-semibold">
 						¥{formatMoney(totalAmount())}
 					</div>
+				</div>
+				<div class="bg-base-200/40 border-base-300 rounded-xl border p-4">
+					<div class="text-base-content/55 flex items-center gap-1 text-sm">
+						<PackageOpen size={16} /> 入库单号
+					</div>
+					{#if detail.stock_in_id && detail.stock_in_no}
+						<a
+							class="link link-primary mt-1 block font-mono text-base font-medium no-underline hover:underline"
+							href="/stock/in/{detail.stock_in_id}"
+						>
+							{detail.stock_in_no}
+						</a>
+					{:else}
+						<div class="mt-1 text-base">-</div>
+					{/if}
 				</div>
 				<div class="bg-base-200/40 border-base-300 rounded-xl border p-4">
 					<div class="text-base-content/55 text-sm">创建时间</div>

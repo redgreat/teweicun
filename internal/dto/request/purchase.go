@@ -8,12 +8,13 @@ package request
 
 type PurchaseOrderQuery struct {
 	PageQuery
-	OrderNo      string `form:"order_no"`
-	SupplierCode string `form:"supplier_code"`
-	OrderStatus  string `form:"order_status"`
-	OrderType    string `form:"order_type"`
-	StartDate    string `form:"start_date"`
-	EndDate      string `form:"end_date"`
+	OrderNo         string `form:"order_no"`
+	SupplierCode    string `form:"supplier_code"`
+	SupplierKeyword string `form:"supplier_keyword"`
+	OrderStatus     string `form:"order_status"`
+	OrderType       string `form:"order_type"`
+	StartDate       string `form:"start_date"`
+	EndDate         string `form:"end_date"`
 }
 
 type CreatePurchaseOrderReq struct {

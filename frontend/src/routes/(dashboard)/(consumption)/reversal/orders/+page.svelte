@@ -6,6 +6,7 @@
 
 <script lang="ts">
 	import DataGrid from '$lib/components/DataGrid.svelte';
+	import CopyableNo from '$lib/components/CopyableNo.svelte';
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
@@ -171,24 +172,13 @@
 		{/snippet}
 		{#snippet cellRender(key, value, row)}
 			{#if key === 'order_no'}
-				<button
-					class="link link-primary font-mono no-underline hover:underline"
-					onclick={() => navigateToDetail(row.id)}
-				>
-					{value || '-'}
-				</button>
+				<CopyableNo value={value} onOpen={() => navigateToDetail(row.id)} />
 			{:else if key === 'status'}
 				{@const style = getStatusStyle(value, 'reversal_order')}
 				<span class="badge badge-md {style.class}">{style.label}</span>
 			{:else if key === 'stock_in_no'}
 				{#if row.stock_in_id}
-					<a
-						href={`/stock/in/${row.stock_in_id}`}
-						class="link link-primary font-mono no-underline hover:underline"
-						title="查看关联入库单"
-					>
-						{value || '-'}
-					</a>
+					<CopyableNo value={value} href={`/stock/in/${row.stock_in_id}`} title="查看关联入库单" />
 				{:else}
 					<span class="text-base-content/30">-</span>
 				{/if}

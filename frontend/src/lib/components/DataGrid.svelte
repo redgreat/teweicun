@@ -15,6 +15,7 @@
 		Download,
 		RotateCw
 	} from 'lucide-svelte';
+	import CopyableNo from '$lib/components/CopyableNo.svelte';
 	import { dgRowBtn, dgToolbarBtn } from '$lib/dgButtonClasses';
 
 	interface Column {
@@ -159,6 +160,10 @@
 		}
 		await onPageChange?.(page);
 	}
+
+	function isCopyableNoKey(key: string) {
+		return /(^|_)no$/.test(key);
+	}
 </script>
 
 <div
@@ -276,6 +281,8 @@
 								>
 									{#if cellRender}
 										{@render cellRender(col.key, row[col.key], row)}
+									{:else if isCopyableNoKey(col.key)}
+										<CopyableNo value={row[col.key]} />
 									{:else}
 										<span class="block truncate" title={row[col.key] || ''}
 											>{row[col.key] || '-'}</span

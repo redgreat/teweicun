@@ -469,21 +469,67 @@ func ListInventoryMaterialLedger(ctx context.Context, q *request.InventoryMateri
 	}
 
 	query := fmt.Sprintf(`
+		WITH ledger AS (
+			SELECT
+				i.material_id,
+				COALESCE(m.material_name, '') AS material_name,
+				i.warehouse_id,
+				COALESCE(w.warehouse_name, '') AS warehouse_name,
+				COALESCE(m.is_code, false) AS is_code,
+				COALESCE(SUM(i.quantity), 0) AS book_quantity,
+				COALESCE(SUM(i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)), 0) AS qty,
+				COALESCE(i.unit_cost, 0) AS unit_cost,
+				COALESCE(SUM((i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)) * COALESCE(i.unit_cost, 0)), 0) AS total_amount,
+				COALESCE(SUM(i.locked_quantity), 0) AS locked_quantity,
+				COALESCE(SUM(COALESCE(i.in_transit_quantity, 0)), 0) AS in_transit_quantity,
+				COUNT(*) AS inventory_count,
+				MAX(CASE WHEN jsonb_array_length(COALESCE(i.custom_attributes, '[]'::jsonb)) > 0 THEN 1 ELSE 0 END) > 0 AS has_custom_attrs
+			%s
+			GROUP BY i.material_id, m.material_name, i.warehouse_id, w.warehouse_name, COALESCE(m.is_code, false), COALESCE(i.unit_cost, 0)
+		)
 		SELECT
-			i.material_id,
-			COALESCE(m.material_name, ''),
-			i.warehouse_id,
-			COALESCE(w.warehouse_name, ''),
-			COALESCE(m.is_code, false),
-			COALESCE(SUM(i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)), 0) AS qty,
-			COALESCE(i.unit_cost, 0) AS unit_cost,
-			COALESCE(SUM((i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)) * COALESCE(i.unit_cost, 0)), 0) AS total_amount,
-			COALESCE(SUM(i.locked_quantity), 0) AS locked_quantity,
-			COUNT(*) AS inventory_count,
-			MAX(CASE WHEN jsonb_array_length(COALESCE(i.custom_attributes, '[]'::jsonb)) > 0 THEN 1 ELSE 0 END) > 0 AS has_custom_attrs
-		%s
-		GROUP BY i.material_id, m.material_name, i.warehouse_id, w.warehouse_name, COALESCE(m.is_code, false), COALESCE(i.unit_cost, 0)
-		ORDER BY m.material_name ASC, w.warehouse_name ASC, COALESCE(i.unit_cost, 0) ASC
+			l.material_id,
+			l.material_name,
+			l.warehouse_id,
+			l.warehouse_name,
+			l.is_code,
+			l.book_quantity,
+			l.qty,
+			l.unit_cost,
+			l.total_amount,
+			l.locked_quantity,
+			l.in_transit_quantity,
+			COALESCE((
+				SELECT COUNT(DISTINCT sc.id)::double precision
+				FROM material_serial_code sc
+				INNER JOIN inventory inv ON inv.id = sc.inventory_id
+				WHERE inv.material_id = l.material_id
+				  AND inv.warehouse_id = l.warehouse_id
+				  AND COALESCE(inv.unit_cost, 0) = l.unit_cost
+				  AND (
+					EXISTS (
+						SELECT 1
+						FROM stock_out_item_serial_selection sel
+						INNER JOIN stock_out_item soi ON soi.id = sel.stock_out_item_id
+						INNER JOIN stock_out so ON so.id = soi.stock_out_id
+						WHERE sel.serial_code_id = sc.id
+						  AND so.deleted_at IS NULL
+						  AND so.status IN ('draft', 'pending')
+					)
+					OR EXISTS (
+						SELECT 1
+						FROM stock_in_item_serial_selection sel
+						INNER JOIN stock_in si ON si.id = sel.stock_in_id
+						WHERE sel.serial_code_id = sc.id
+						  AND si.deleted_at IS NULL
+						  AND si.stock_in_status IN ('preparing', 'pending')
+					)
+				  )
+			), 0) AS serial_reserved_quantity,
+			l.inventory_count,
+			l.has_custom_attrs
+		FROM ledger l
+		ORDER BY l.material_name ASC, l.warehouse_name ASC, l.unit_cost ASC
 		LIMIT $%d OFFSET $%d
 	`, groupBase, argID, argID+1)
 
@@ -499,7 +545,9 @@ func ListInventoryMaterialLedger(ctx context.Context, q *request.InventoryMateri
 		var item response.InventoryMaterialLedgerResp
 		if err := rows.Scan(
 			&item.MaterialID, &item.MaterialName, &item.WarehouseID, &item.WarehouseName,
-			&item.IsCode, &item.Quantity, &item.UnitCost, &item.TotalAmount, &item.LockedQuantity, &item.InventoryCount, &item.HasCustomAttrs,
+			&item.IsCode, &item.BookQuantity, &item.Quantity, &item.UnitCost, &item.TotalAmount,
+			&item.LockedQuantity, &item.InTransitQuantity, &item.SerialReservedQuantity,
+			&item.InventoryCount, &item.HasCustomAttrs,
 		); err != nil {
 			return nil, 0, nil, err
 		}
@@ -520,13 +568,63 @@ func ListInventoryMaterialLedgerSerials(ctx context.Context, q *request.Inventor
 				WHEN 'returned' THEN '已退回'
 				WHEN 'scrapped' THEN '已报废'
 				ELSE sc.status
-			END AS status_name
+			END AS status_name,
+			CASE
+				WHEN sc.status = 'in_stock' AND EXISTS (
+					SELECT 1
+					FROM stock_out_item_serial_selection sel
+					INNER JOIN stock_out_item soi ON soi.id = sel.stock_out_item_id
+					INNER JOIN stock_out so ON so.id = soi.stock_out_id
+					WHERE sel.serial_code_id = sc.id
+					  AND so.deleted_at IS NULL
+					  AND so.status IN ('draft', 'pending')
+				) THEN 'stock_out_reserved'
+				WHEN sc.status = 'issued' AND EXISTS (
+					SELECT 1
+					FROM stock_in_item_serial_selection sel
+					INNER JOIN stock_in si ON si.id = sel.stock_in_id
+					WHERE sel.serial_code_id = sc.id
+					  AND si.deleted_at IS NULL
+					  AND si.stock_in_status IN ('preparing', 'pending')
+				) THEN 'stock_in_reserved'
+				ELSE sc.status
+			END AS display_status,
+			CASE
+				WHEN sc.status = 'in_stock' AND EXISTS (
+					SELECT 1
+					FROM stock_out_item_serial_selection sel
+					INNER JOIN stock_out_item soi ON soi.id = sel.stock_out_item_id
+					INNER JOIN stock_out so ON so.id = soi.stock_out_id
+					WHERE sel.serial_code_id = sc.id
+					  AND so.deleted_at IS NULL
+					  AND so.status IN ('draft', 'pending')
+				) THEN '出库备货中'
+				WHEN sc.status = 'issued' AND EXISTS (
+					SELECT 1
+					FROM stock_in_item_serial_selection sel
+					INNER JOIN stock_in si ON si.id = sel.stock_in_id
+					WHERE sel.serial_code_id = sc.id
+					  AND si.deleted_at IS NULL
+					  AND si.stock_in_status IN ('preparing', 'pending')
+				) THEN '退料备货中'
+				WHEN sc.status = 'in_stock' THEN '在库'
+				WHEN sc.status = 'issued' THEN '已领用'
+				WHEN sc.status = 'returned' THEN '已退回'
+				WHEN sc.status = 'scrapped' THEN '已报废'
+				ELSE sc.status
+			END AS display_status_name
 		FROM material_serial_code sc
 		INNER JOIN inventory i ON i.id = sc.inventory_id
 		WHERE i.material_id = $1
 		  AND i.warehouse_id = $2
 		  AND COALESCE(i.unit_cost, 0) = $3
-		ORDER BY sc.serial_code ASC
+		ORDER BY
+			CASE
+				WHEN sc.status = 'in_stock' THEN 1
+				WHEN sc.status = 'issued' THEN 2
+				ELSE 3
+			END,
+			sc.serial_code ASC
 	`
 	rows, err := database.Pool.Query(ctx, sql, q.MaterialID, q.WarehouseID, q.UnitCost)
 	if err != nil {
@@ -537,7 +635,7 @@ func ListInventoryMaterialLedgerSerials(ctx context.Context, q *request.Inventor
 	out := make([]response.InventoryMaterialLedgerSerialResp, 0)
 	for rows.Next() {
 		var item response.InventoryMaterialLedgerSerialResp
-		if err := rows.Scan(&item.SerialCode, &item.Status, &item.StatusName); err != nil {
+		if err := rows.Scan(&item.SerialCode, &item.Status, &item.StatusName, &item.DisplayStatus, &item.DisplayStatusName); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -598,21 +696,67 @@ func ExportInventoryMaterialLedger(ctx context.Context, q *request.InventoryMate
 	}
 
 	query := fmt.Sprintf(`
+		WITH ledger AS (
+			SELECT
+				i.material_id,
+				COALESCE(m.material_name, '') AS material_name,
+				i.warehouse_id,
+				COALESCE(w.warehouse_name, '') AS warehouse_name,
+				COALESCE(m.is_code, false) AS is_code,
+				COALESCE(SUM(i.quantity), 0) AS book_quantity,
+				COALESCE(SUM(i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)), 0) AS qty,
+				COALESCE(i.unit_cost, 0) AS unit_cost,
+				COALESCE(SUM((i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)) * COALESCE(i.unit_cost, 0)), 0) AS total_amount,
+				COALESCE(SUM(i.locked_quantity), 0) AS locked_quantity,
+				COALESCE(SUM(COALESCE(i.in_transit_quantity, 0)), 0) AS in_transit_quantity,
+				COUNT(*) AS inventory_count,
+				MAX(CASE WHEN jsonb_array_length(COALESCE(i.custom_attributes, '[]'::jsonb)) > 0 THEN 1 ELSE 0 END) > 0 AS has_custom_attrs
+			%s
+			GROUP BY i.material_id, m.material_name, i.warehouse_id, w.warehouse_name, COALESCE(m.is_code, false), COALESCE(i.unit_cost, 0)
+		)
 		SELECT
-			i.material_id,
-			COALESCE(m.material_name, ''),
-			i.warehouse_id,
-			COALESCE(w.warehouse_name, ''),
-			COALESCE(m.is_code, false),
-			COALESCE(SUM(i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)), 0) AS qty,
-			COALESCE(i.unit_cost, 0) AS unit_cost,
-			COALESCE(SUM((i.quantity - i.locked_quantity - COALESCE(i.in_transit_quantity, 0)) * COALESCE(i.unit_cost, 0)), 0) AS total_amount,
-			COALESCE(SUM(i.locked_quantity), 0) AS locked_quantity,
-			COUNT(*) AS inventory_count,
-			MAX(CASE WHEN jsonb_array_length(COALESCE(i.custom_attributes, '[]'::jsonb)) > 0 THEN 1 ELSE 0 END) > 0 AS has_custom_attrs
-		%s
-		GROUP BY i.material_id, m.material_name, i.warehouse_id, w.warehouse_name, COALESCE(m.is_code, false), COALESCE(i.unit_cost, 0)
-		ORDER BY m.material_name ASC, w.warehouse_name ASC, COALESCE(i.unit_cost, 0) ASC
+			l.material_id,
+			l.material_name,
+			l.warehouse_id,
+			l.warehouse_name,
+			l.is_code,
+			l.book_quantity,
+			l.qty,
+			l.unit_cost,
+			l.total_amount,
+			l.locked_quantity,
+			l.in_transit_quantity,
+			COALESCE((
+				SELECT COUNT(DISTINCT sc.id)::double precision
+				FROM material_serial_code sc
+				INNER JOIN inventory inv ON inv.id = sc.inventory_id
+				WHERE inv.material_id = l.material_id
+				  AND inv.warehouse_id = l.warehouse_id
+				  AND COALESCE(inv.unit_cost, 0) = l.unit_cost
+				  AND (
+					EXISTS (
+						SELECT 1
+						FROM stock_out_item_serial_selection sel
+						INNER JOIN stock_out_item soi ON soi.id = sel.stock_out_item_id
+						INNER JOIN stock_out so ON so.id = soi.stock_out_id
+						WHERE sel.serial_code_id = sc.id
+						  AND so.deleted_at IS NULL
+						  AND so.status IN ('draft', 'pending')
+					)
+					OR EXISTS (
+						SELECT 1
+						FROM stock_in_item_serial_selection sel
+						INNER JOIN stock_in si ON si.id = sel.stock_in_id
+						WHERE sel.serial_code_id = sc.id
+						  AND si.deleted_at IS NULL
+						  AND si.stock_in_status IN ('preparing', 'pending')
+					)
+				  )
+			), 0) AS serial_reserved_quantity,
+			l.inventory_count,
+			l.has_custom_attrs
+		FROM ledger l
+		ORDER BY l.material_name ASC, l.warehouse_name ASC, l.unit_cost ASC
 	`, groupBase)
 
 	rows, err := database.Pool.Query(ctx, query, args...)
@@ -626,7 +770,9 @@ func ExportInventoryMaterialLedger(ctx context.Context, q *request.InventoryMate
 		var item response.InventoryMaterialLedgerResp
 		if err := rows.Scan(
 			&item.MaterialID, &item.MaterialName, &item.WarehouseID, &item.WarehouseName,
-			&item.IsCode, &item.Quantity, &item.UnitCost, &item.TotalAmount, &item.LockedQuantity, &item.InventoryCount, &item.HasCustomAttrs,
+			&item.IsCode, &item.BookQuantity, &item.Quantity, &item.UnitCost, &item.TotalAmount,
+			&item.LockedQuantity, &item.InTransitQuantity, &item.SerialReservedQuantity,
+			&item.InventoryCount, &item.HasCustomAttrs,
 		); err != nil {
 			return nil, nil, err
 		}

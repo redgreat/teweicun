@@ -1,5 +1,5 @@
-# Build stage
-FROM golang:1.25-alpine AS builder
+# Backend build stage
+FROM golang:1.25-alpine AS backend-builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -18,8 +18,10 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositorie
 RUN apk add --no-cache tzdata ca-certificates && \
     mkdir -p /var/log/teweicun
 WORKDIR /app
-COPY --from=builder /app/main .
-COPY --from=builder /app/configs ./configs
+COPY --from=backend-builder /app/main .
+COPY --from=backend-builder /app/configs ./configs
+RUN rm -rf ./frontend-dist
+COPY frontend/build ./frontend-dist
 
 EXPOSE 8080
 CMD ["./main"]

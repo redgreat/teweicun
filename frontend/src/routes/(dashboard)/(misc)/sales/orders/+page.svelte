@@ -6,11 +6,12 @@
 
 <script lang="ts">
 	import DataGrid from '$lib/components/DataGrid.svelte';
+	import CopyableNo from '$lib/components/CopyableNo.svelte';
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { FileText, CircleCheckBig, Truck, Ban } from 'lucide-svelte';
+	import { FileText, CircleCheckBig, Ban } from 'lucide-svelte';
 	import { dgRowBtn, dgRowBtnDanger, dgRowBtnSuccess, dgToolbarBtn } from '$lib/dgButtonClasses';
 	import { getStatusStyle } from '$lib/statusStyles';
 	import { formatDateInCn } from '$lib/datetime';
@@ -36,11 +37,12 @@
 	});
 
 	const columns = [
-		{ key: 'order_no', label: '销售单号', class: 'font-mono text-primary', width: '15%' },
-		{ key: 'customer_name', label: '客户名称', width: '16%' },
-		{ key: 'order_date', label: '下单日期', class: 'text-center', width: '12%' },
-		{ key: 'delivery_date', label: '交付日期', class: 'text-center', width: '12%' },
-		{ key: 'total_amount', label: '订单金额', class: 'text-right pr-4', width: '14%' },
+		{ key: 'order_no', label: '销售单号', class: 'font-mono text-primary', width: '14%' },
+		{ key: 'customer_name', label: '客户名称', width: '15%' },
+		{ key: 'stock_out_no', label: '出库单号', class: 'font-mono', width: '14%' },
+		{ key: 'order_date', label: '下单日期', class: 'text-center', width: '11%' },
+		{ key: 'delivery_date', label: '交付日期', class: 'text-center', width: '11%' },
+		{ key: 'total_amount', label: '订单金额', class: 'text-right pr-4', width: '13%' },
 		{ key: 'order_status', label: '状态', class: 'text-center', width: '10%' }
 	];
 
@@ -196,15 +198,6 @@
 		}
 	}
 
-	function openStockOut(row: any) {
-		const stockOutID = Number(row?.stock_out_id || 0);
-		if (!stockOutID) {
-			toast.error('该销售订单未关联出库单，请刷新后重试');
-			return;
-		}
-		goto(`/stock/out/${stockOutID}`);
-	}
-
 	onMount(() => {
 		loadData(1);
 	});
@@ -316,17 +309,18 @@
 
 		{#snippet cellRender(key, value, row)}
 			{#if key === 'order_no'}
-				<a
-					href={`/sales/orders/${row.id}`}
-					class="link link-primary font-mono no-underline hover:underline"
-				>
-					{value || '-'}
-				</a>
+				<CopyableNo value={value} href={`/sales/orders/${row.id}`} />
 			{:else if key === 'order_status'}
 				{@const style = getStatusStyle(value, 'sales_order')}
 				<span class="badge badge-md whitespace-nowrap {style.class}">{style.label}</span>
 			{:else if key === 'total_amount'}
 				<span class="text-success font-semibold">{formatMoney(value)}</span>
+			{:else if key === 'stock_out_no'}
+				{#if row.stock_out_id && value}
+					<CopyableNo value={value} href={`/stock/out/${row.stock_out_id}`} title="查看关联出库单" />
+				{:else}
+					<span>-</span>
+				{/if}
 			{:else if key === 'order_date' || key === 'delivery_date'}
 				<span class="whitespace-nowrap">{formatDate(value)}</span>
 			{:else}
@@ -342,11 +336,6 @@
 				{#if row.order_status === 'draft'}
 					<button type="button" class={dgRowBtnSuccess} onclick={() => handleConfirm(row)}>
 						<CircleCheckBig size={16} /> 提交
-					</button>
-				{/if}
-				{#if row.order_status === 'confirmed' || row.order_status === 'preparing'}
-					<button type="button" class={dgRowBtn} onclick={() => openStockOut(row)}>
-						<Truck size={16} /> 出库单
 					</button>
 				{/if}
 				{#if row.order_status !== 'shipped' && row.order_status !== 'cancelled'}

@@ -7,6 +7,7 @@
 <script lang="ts">
 	import DataGrid from '$lib/components/DataGrid.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import CopyableNo from '$lib/components/CopyableNo.svelte';
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { onMount } from 'svelte';
@@ -324,13 +325,7 @@
 		{/snippet}
 		{#snippet cellRender(key, value, row)}
 			{#if key === 'return_no'}
-				<a
-					href={`/purchase/return/${row.id}`}
-					class="link link-primary font-mono no-underline hover:underline"
-					title="查看详情"
-				>
-					{value || '-'}
-				</a>
+				<CopyableNo value={value} href={`/purchase/return/${row.id}`} title="查看详情" />
 			{:else if key === 'supplier_name'}
 				<span class="block truncate" title={value || '-'}>
 					{value || '-'}
@@ -342,13 +337,7 @@
 				{formatDate(value)}
 			{:else if key === 'stock_out_no'}
 				{#if row.stock_out_id}
-					<a
-						href={`/stock/out/${row.stock_out_id}`}
-						class="link link-primary font-mono no-underline hover:underline"
-						title="查看关联出库单"
-					>
-						{value || '-'}
-					</a>
+					<CopyableNo value={value} href={`/stock/out/${row.stock_out_id}`} title="查看关联出库单" />
 				{:else}
 					<span class="text-base-content/30">-</span>
 				{/if}
