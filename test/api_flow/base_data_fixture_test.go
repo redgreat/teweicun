@@ -342,13 +342,13 @@ func writeBaseDataFixture(t *testing.T, fixture BaseDataFixture) {
 
 func uniqueChineseName(base string) string {
 	n := time.Now().UnixNano()
-	runes := []rune(base)
-	for i := 0; i < 4; i++ {
-		runes = append(runes, chineseDigits[n%int64(len(chineseDigits))])
+	prefix := []rune(base)
+	if len(prefix) > 6 {
+		prefix = prefix[:6]
+	}
+	for i := 0; i < 6; i++ {
+		prefix = append(prefix, chineseDigits[n%int64(len(chineseDigits))])
 		n /= int64(len(chineseDigits))
 	}
-	if len(runes) > 10 {
-		runes = runes[:10]
-	}
-	return string(runes)
+	return string(prefix)
 }

@@ -110,7 +110,6 @@ func QueryMaterialSerialCodesByStockOutItem(ctx context.Context, stockOutItemID 
 		LEFT JOIN warehouse w ON w.id = sc.warehouse_id
 		WHERE t.stock_out_status = 'confirmed'
 		  AND sc.material_id = t.material_id
-		  AND sc.inventory_id = t.inventory_id
 		ORDER BY serial_code ASC
 	`
 	rows, err := database.Pool.Query(ctx, sql, stockOutItemID)

@@ -820,20 +820,25 @@ func setStockInWarehouseIfEmpty(ctx context.Context, t *testing.T, c *testutil.C
 
 func mustPickInventoryAvailable(ctx context.Context, t *testing.T, c *testutil.Client, warehouseCode string, materialID int64, isCode bool, qty float64) InventoryAvailable {
 	t.Helper()
-	q := url.Values{}
-	q.Set("page", "1")
-	q.Set("page_size", "100")
-	q.Set("warehouse_code", warehouseCode)
-	var list []InventoryAvailable
-	if err := c.DoPage(ctx, http.MethodGet, "/api/v1/inventory/available", q, &list, nil); err != nil {
-		t.Fatalf("list inventory available failed: %v", err)
-	}
-	for _, it := range list {
-		if it.MaterialID == materialID && it.IsCode == isCode && it.AvailableQuantity >= qty {
-			return it
+	for page := 1; page <= 10; page++ {
+		q := url.Values{}
+		q.Set("page", fmt.Sprintf("%d", page))
+		q.Set("page_size", "100")
+		q.Set("warehouse_code", warehouseCode)
+		var list []InventoryAvailable
+		if err := c.DoPage(ctx, http.MethodGet, "/api/v1/inventory/available", q, &list, nil); err != nil {
+			t.Fatalf("list inventory available failed: %v", err)
+		}
+		for _, it := range list {
+			if it.MaterialID == materialID && it.IsCode == isCode && it.AvailableQuantity >= qty {
+				return it
+			}
+		}
+		if len(list) < 100 {
+			break
 		}
 	}
-	t.Fatalf("cannot find inventory available for material=%d qty>=%.2f (got %d rows)", materialID, qty, len(list))
+	t.Fatalf("cannot find inventory available: warehouse=%s material=%d is_code=%v qty>=%.2f", warehouseCode, materialID, isCode, qty)
 	return InventoryAvailable{}
 }
 
@@ -980,14 +985,21 @@ func pickSerialSamples(in []SerialCodeItem, n int) []SerialCodeItem {
 
 func mustFetchLedger(ctx context.Context, t *testing.T, c *testutil.Client) []InventoryMaterialLedgerRow {
 	t.Helper()
-	q := url.Values{}
-	q.Set("page", "1")
-	q.Set("page_size", "100")
-	var list []InventoryMaterialLedgerRow
-	if err := c.DoPage(ctx, http.MethodGet, "/api/v1/inventory/material-ledger", q, &list, nil); err != nil {
-		t.Fatalf("list material ledger failed: %v", err)
+	var all []InventoryMaterialLedgerRow
+	for page := 1; page <= 10; page++ {
+		q := url.Values{}
+		q.Set("page", fmt.Sprintf("%d", page))
+		q.Set("page_size", "100")
+		var list []InventoryMaterialLedgerRow
+		if err := c.DoPage(ctx, http.MethodGet, "/api/v1/inventory/material-ledger", q, &list, nil); err != nil {
+			t.Fatalf("list material ledger failed: %v", err)
+		}
+		all = append(all, list...)
+		if len(list) < 100 {
+			break
+		}
 	}
-	return list
+	return all
 }
 
 func findLedgerQty(rows []InventoryMaterialLedgerRow, materialID int64) float64 {

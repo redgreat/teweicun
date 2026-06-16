@@ -8,6 +8,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -586,11 +587,19 @@ func UpdateStockIn(ctx context.Context, id int64, warehouseCode string, _ string
 
 UPDATE_ITEMS:
 	for _, item := range items {
+		customAttrsJSON := []byte("[]")
+		if item.CustomAttributes != nil {
+			buf, marshalErr := json.Marshal(item.CustomAttributes)
+			if marshalErr != nil {
+				return fmt.Errorf("入库明细自定义属性格式无效: %w", marshalErr)
+			}
+			customAttrsJSON = buf
+		}
 		_, err := tx.Exec(ctx, `
 			UPDATE stock_in_item
-			SET arrived_quantity = $1, accepted_quantity = $2, unit_cost = $3
-			WHERE id = $4 AND stock_in_id = $5
-		`, item.ArrivedQuantity, item.AcceptedQuantity, item.UnitCost, item.ID, id)
+			SET arrived_quantity = $1, accepted_quantity = $2, unit_cost = $3, custom_attributes = $4
+			WHERE id = $5 AND stock_in_id = $6
+		`, item.ArrivedQuantity, item.AcceptedQuantity, item.UnitCost, customAttrsJSON, item.ID, id)
 		if err != nil {
 			return err
 		}

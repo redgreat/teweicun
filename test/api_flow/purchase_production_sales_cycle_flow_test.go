@@ -537,18 +537,24 @@ func mustCreateReversalOrderSingle(ctx context.Context, t *testing.T, c *testuti
 
 func mustSumAvailableQty(ctx context.Context, t *testing.T, c *testutil.Client, warehouseCode string, materialID int64) float64 {
 	t.Helper()
-	q := url.Values{}
-	q.Set("page", "1")
-	q.Set("page_size", "100")
-	q.Set("warehouse_code", warehouseCode)
-	var list []InventoryAvailable
-	if err := c.DoPage(ctx, http.MethodGet, "/api/v1/inventory/available", q, &list, nil); err != nil {
-		t.Fatalf("list inventory available failed: %v", err)
-	}
 	var sum float64
-	for _, it := range list {
-		if it.MaterialID == materialID {
-			sum += it.AvailableQuantity
+	for page := 1; page <= 5; page++ {
+		q := url.Values{}
+		q.Set("page", fmt.Sprintf("%d", page))
+		q.Set("page_size", "100")
+		q.Set("warehouse_code", warehouseCode)
+		var list []InventoryAvailable
+		var total int64
+		if err := c.DoPage(ctx, http.MethodGet, "/api/v1/inventory/available", q, &list, &total); err != nil {
+			t.Fatalf("list inventory available failed: %v", err)
+		}
+		for _, it := range list {
+			if it.MaterialID == materialID {
+				sum += it.AvailableQuantity
+			}
+		}
+		if len(list) < 100 || int64(page*100) >= total {
+			break
 		}
 	}
 	return sum
