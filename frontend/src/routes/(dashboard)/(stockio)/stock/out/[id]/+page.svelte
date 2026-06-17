@@ -169,7 +169,6 @@
 
 	async function openSerialPicker(item: any) {
 		if (!canConfirm) return;
-		if (detail?.status !== 'pending') return;
 		if (!item?.is_code) return;
 		pickerItem = item;
 		pickerSelectedOnly = false;
@@ -529,7 +528,7 @@
 					<tbody>
 						{#each detail.items || [] as it}
 							<tr
-								class="hover:bg-base-200/50 transition-colors {detail.status === 'pending' &&
+								class="hover:bg-base-200/50 transition-colors {canConfirm &&
 								insufficientPreparedItems[it.id]
 									? 'bg-error/10'
 									: ''}"
@@ -583,9 +582,10 @@
 								<td>
 									{#if !hasSerialCodes(it)}
 										<span class="text-base-content/40">-</span>
-									{:else if canConfirm && detail.status === 'pending'}
+									{:else if canConfirm}
 										<button
 											type="button"
+											data-testid="stock-out-serial-picker-trigger"
 											class="badge badge-sm {selectedCount(it.id) === getNeedCount(it)
 												? 'badge-success'
 												: 'badge-warning'} cursor-pointer"
@@ -614,6 +614,7 @@
 
 {#if pickerOpen}
 	<div
+		data-testid="stock-out-serial-picker"
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
 		role="button"
 		tabindex="0"
@@ -632,6 +633,7 @@
 				<h3 class="text-lg font-bold">{pickerItem?.material_name || ''} - 选择编码</h3>
 				<div class="flex items-center gap-2">
 					<button
+						data-testid="serial-auto-pick"
 						class="btn btn-sm btn-ghost gap-1"
 						onclick={autoPickCurrentItem}
 						disabled={pickerLoading}
@@ -639,6 +641,7 @@
 						<Wand2 size={16} /> 自动选择
 					</button>
 					<button
+						data-testid="serial-clear-selection"
 						class="btn btn-sm btn-ghost text-error"
 						onclick={clearAllSelectionsForPickerItem}
 						disabled={pickerLoading || selectionSaving}
@@ -646,6 +649,7 @@
 						清空已选
 					</button>
 					<button
+						data-testid="serial-save-selection"
 						class="btn btn-sm btn-primary text-white"
 						onclick={saveCurrentItemSelections}
 						disabled={pickerLoading || selectionSaving}
@@ -671,6 +675,7 @@
 						</div>
 						<div class="flex items-center gap-3">
 							<input
+								data-testid="serial-search-input"
 								type="text"
 								bind:value={pickerSearchTerm}
 								placeholder="搜索/扫码输入编码..."
@@ -691,6 +696,7 @@
 					<div class="space-y-2">
 						{#each sortedPickerOptions() as code (Number(code?.id))}
 							<label
+								data-testid="serial-option"
 								class="border-base-300 flex cursor-pointer items-center gap-3 rounded-lg border p-3"
 							>
 								<input

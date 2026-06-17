@@ -141,11 +141,17 @@ type ReturnOrder struct {
 }
 
 type InventoryMaterialLedgerRow struct {
-	MaterialID    int64   `json:"material_id"`
-	MaterialName  string  `json:"material_name"`
-	IsCode        bool    `json:"is_code"`
-	Quantity      float64 `json:"quantity"`
-	WarehouseName string  `json:"warehouse_name"`
+	MaterialID             int64   `json:"material_id"`
+	MaterialName           string  `json:"material_name"`
+	WarehouseID            int64   `json:"warehouse_id"`
+	WarehouseName          string  `json:"warehouse_name"`
+	IsCode                 bool    `json:"is_code"`
+	BookQuantity           float64 `json:"book_quantity"`
+	Quantity               float64 `json:"quantity"`
+	UnitCost               float64 `json:"unit_cost"`
+	LockedQuantity         float64 `json:"locked_quantity"`
+	InTransitQuantity      float64 `json:"in_transit_quantity"`
+	SerialReservedQuantity float64 `json:"serial_reserved_quantity"`
 }
 
 type TraceMaterialResult struct {

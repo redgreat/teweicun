@@ -262,11 +262,11 @@ func CreateStockIn(ctx context.Context, req *request.CreateStockInReq, userID in
 	}
 
 	itemQuery := `
-		INSERT INTO stock_in_item (stock_in_id, material_id, arrived_quantity, accepted_quantity, unit_cost)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO stock_in_item (stock_in_id, material_id, arrived_quantity, accepted_quantity, unit, unit_cost, cert_id)
+		VALUES ($1, $2, $3, $4, (SELECT unit FROM material WHERE id = $2), $5, NULLIF($6, 0))
 	`
 	for _, item := range req.Items {
-		_, err := tx.Exec(ctx, itemQuery, stockInID, item.MaterialID, item.ArrivedQuantity, item.AcceptedQuantity, item.UnitPrice)
+		_, err := tx.Exec(ctx, itemQuery, stockInID, item.MaterialID, item.ArrivedQuantity, item.AcceptedQuantity, item.UnitPrice, item.CertID)
 		if err != nil {
 			return 0, err
 		}
@@ -611,11 +611,11 @@ UPDATE_ITEMS:
 func generateStockInNo(ctx context.Context, tx pgx.Tx) (string, error) {
 	var stockInNo string
 	query := `
-		SELECT TO_CHAR(NOW(), 'YYYYMMDD') || LPAD(nextval('stock_in_no_seq')::TEXT, 3, '0')
+		SELECT fn_generate_serial_no('SI')
 	`
 	err := tx.QueryRow(ctx, query).Scan(&stockInNo)
 	if err != nil {
 		return "", err
 	}
-	return "SI" + stockInNo, nil
+	return stockInNo, nil
 }
