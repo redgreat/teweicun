@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/redgreat/teweicun/internal/dto/request"
 	"github.com/redgreat/teweicun/internal/dto/response"
@@ -91,6 +92,9 @@ func GetStockTransferDetail(ctx context.Context, id int64) (*response.StockTrans
 	err := database.Pool.QueryRow(ctx, query, id).Scan(&item.ID, &item.TransferNo, &item.FromWarehouseID, &item.FromWarehouseName,
 		&item.ToWarehouseID, &item.ToWarehouseName, &item.TransferDate, &item.Status, &item.Remark, &item.CreatedAt)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -152,10 +156,10 @@ func CreateStockTransfer(ctx context.Context, req *request.CreateStockTransferRe
 	// 3. 插入明细表
 	for _, item := range req.Items {
 		itemQuery := `
-			INSERT INTO stock_transfer_item (transfer_id, material_id, quantity, unit, remark)
-			VALUES ($1, $2, $3, (SELECT unit FROM material WHERE id = $2), $4)
+			INSERT INTO stock_transfer_item (transfer_id, material_id, inventory_id, quantity, unit, remark)
+			VALUES ($1, $2, $3, $4, (SELECT unit FROM material WHERE id = $2), $5)
 		`
-		_, err = tx.Exec(ctx, itemQuery, id, item.MaterialID, item.Quantity, item.Remark)
+		_, err = tx.Exec(ctx, itemQuery, id, item.MaterialID, item.InventoryID, item.Quantity, item.Remark)
 		if err != nil {
 			return 0, err
 		}

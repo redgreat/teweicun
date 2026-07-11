@@ -22,6 +22,8 @@ type SalesOrderItemResp struct {
 	Amount          float64             `json:"amount"`
 	ShippedQuantity float64             `json:"shipped_quantity"`
 	Unit            string              `json:"unit"`
+	UnitCost        float64             `json:"unit_cost,omitempty"`
+	CostAmount      float64             `json:"cost_amount,omitempty"`
 	Remark          database.NullString `json:"remark"`
 }
 

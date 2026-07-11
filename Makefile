@@ -34,7 +34,7 @@ test:
 	$(MAKE) test-flow
 
 test-flow:
-	go test -v $(FLOW_TEST_FLAGS) ./test/... -run TestFlow_PurchaseToReversalAndReturn
+	go test -v $(FLOW_TEST_FLAGS) ./test/... -run "^TestFlow_"
 
 build:
 	go build -o tmp/api-server cmd/server/main.go

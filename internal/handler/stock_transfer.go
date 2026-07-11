@@ -51,6 +51,10 @@ func GetStockTransferDetail(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
+	if detail == nil {
+		response.Error(c, errcode.ErrNotFound)
+		return
+	}
 	response.Success(c, detail)
 }
 

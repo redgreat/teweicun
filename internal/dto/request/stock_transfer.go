@@ -13,9 +13,10 @@ type StockTransferQuery struct {
 }
 
 type CreateStockTransferItem struct {
-	MaterialID int64   `json:"material_id" binding:"required"`
-	Quantity   float64 `json:"quantity" binding:"required,gt=0"`
-	Remark     string  `json:"remark"`
+	InventoryID int64   `json:"inventory_id" binding:"required"`
+	MaterialID  int64   `json:"material_id" binding:"required"`
+	Quantity    float64 `json:"quantity" binding:"required,gt=0"`
+	Remark      string  `json:"remark"`
 }
 
 type CreateStockTransferReq struct {
@@ -23,5 +24,5 @@ type CreateStockTransferReq struct {
 	ToWarehouseID   int64                     `json:"to_warehouse_id" binding:"required"`
 	TransferDate    string                    `json:"transfer_date" binding:"required"`
 	Remark          string                    `json:"remark"`
-	Items           []CreateStockTransferItem `json:"items" binding:"required,dive,min=1"`
+	Items           []CreateStockTransferItem `json:"items" binding:"required,min=1,dive"`
 }

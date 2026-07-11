@@ -176,9 +176,21 @@ func GetSalesOrderDetail(ctx context.Context, id int64) (*response.SalesOrderRes
 		       COALESCE(soi.material_code, m.material_code, ''),
 		       COALESCE(soi.material_name, m.material_name, ''),
 		       soi.quantity, soi.unit_price, soi.amount, soi.shipped_quantity, 
-		       COALESCE(soi.unit, m.unit, ''), soi.remark
+		       COALESCE(soi.unit, m.unit, ''), soi.remark,
+		       COALESCE(cost.avg_unit_cost, 0) AS unit_cost,
+		       COALESCE(cost.avg_unit_cost, 0) * soi.quantity AS cost_amount
 		FROM sales_order_item soi
 		LEFT JOIN material m ON m.id = soi.material_id AND m.deleted_at IS NULL
+		LEFT JOIN LATERAL (
+			SELECT CASE WHEN SUM(sii.accepted_quantity) > 0
+				THEN SUM(sii.accepted_quantity * sii.unit_cost) / SUM(sii.accepted_quantity)
+				ELSE 0 END AS avg_unit_cost
+			FROM stock_in_item sii
+			INNER JOIN stock_in si ON si.id = sii.stock_in_id AND si.deleted_at IS NULL
+			WHERE sii.material_id = soi.material_id
+			  AND sii.accepted_quantity > 0
+			  AND sii.unit_cost > 0
+		) cost ON true
 		WHERE soi.order_id = $1
 	`
 	rows, err := database.Pool.Query(ctx, itemQuery, id)
@@ -190,7 +202,8 @@ func GetSalesOrderDetail(ctx context.Context, id int64) (*response.SalesOrderRes
 	for rows.Next() {
 		var sub response.SalesOrderItemResp
 		if err := rows.Scan(&sub.ID, &sub.MaterialID, &sub.MaterialCode, &sub.MaterialName,
-			&sub.Quantity, &sub.UnitPrice, &sub.Amount, &sub.ShippedQuantity, &sub.Unit, &sub.Remark); err != nil {
+			&sub.Quantity, &sub.UnitPrice, &sub.Amount, &sub.ShippedQuantity, &sub.Unit, &sub.Remark,
+			&sub.UnitCost, &sub.CostAmount); err != nil {
 			return nil, err
 		}
 		item.Items = append(item.Items, sub)

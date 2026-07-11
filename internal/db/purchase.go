@@ -264,7 +264,7 @@ func CreatePurchaseOrder(ctx context.Context, req *request.CreatePurchaseOrderRe
 	`, req.SupplierCode).Scan(&supplierID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return 0, fmt.Errorf("供应商不存在或已删除")
+			return 0, fmt.Errorf("DB_ERROR: 供应商不存在或已删除")
 		}
 		return 0, err
 	}
@@ -303,7 +303,7 @@ func CreatePurchaseOrder(ctx context.Context, req *request.CreatePurchaseOrderRe
 		materialID := item.MaterialID
 		customAttributes := []byte("[]")
 		if materialID == 0 {
-			return 0, fmt.Errorf("采购订货明细必须选择物料")
+			return 0, fmt.Errorf("DB_ERROR: 采购订货明细必须选择物料")
 		}
 		if orderType == "purchase" {
 			err := tx.QueryRow(ctx, `
@@ -312,7 +312,7 @@ func CreatePurchaseOrder(ctx context.Context, req *request.CreatePurchaseOrderRe
 			`, materialID).Scan(&customAttributes)
 			if err != nil {
 				if err == pgx.ErrNoRows {
-					return 0, fmt.Errorf("物料不存在或已删除")
+					return 0, fmt.Errorf("DB_ERROR: 物料不存在或已删除")
 				}
 				return 0, err
 			}
@@ -412,7 +412,7 @@ func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurch
 			materialID := item.MaterialID
 			customAttributes := []byte("[]")
 			if materialID == 0 {
-				return fmt.Errorf("采购订货明细必须选择物料")
+							return fmt.Errorf("DB_ERROR: 采购订货明细必须选择物料")
 			}
 			if orderType == "purchase" {
 				if err := tx.QueryRow(ctx, `
@@ -420,7 +420,7 @@ func UpdatePurchaseOrder(ctx context.Context, id int64, req *request.UpdatePurch
 					FROM material WHERE id = $1 AND deleted_at IS NULL
 				`, materialID).Scan(&customAttributes); err != nil {
 					if err == pgx.ErrNoRows {
-						return fmt.Errorf("物料不存在或已删除")
+											return fmt.Errorf("DB_ERROR: 物料不存在或已删除")
 					}
 					return err
 				}
@@ -475,7 +475,10 @@ func ConfirmPurchaseOrder(ctx context.Context, orderID, userID int64) error {
 	}
 
 	_, err = database.Pool.Exec(ctx, `CALL sp_confirm_purchase_order($1, $2)`, orderID, userID)
-	return err
+	if err != nil {
+		return fmt.Errorf("DB_ERROR: %s", strings.TrimSpace(err.Error()))
+	}
+	return nil
 }
 
 func generateOrderNo(ctx context.Context, tx pgx.Tx, prefix string) (string, error) {
