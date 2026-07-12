@@ -1,7 +1,7 @@
 <!--
-功能：生产单据列表（系统自动生成，仅展示）
-创建时间：2026-06-06
-创建人：GPT-5.2
+功能：生产单据列表（支持手动新增和编辑成本）
+创建时间：2026-06-06 / 更新：2026-07-12
+创建人：GPT-5.2 / Hermes Agent
 -->
 
 <script lang="ts">
@@ -12,6 +12,7 @@
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { formatDateInCn } from '$lib/datetime';
+	import { Plus } from 'lucide-svelte';
 
 	let rows = $state<any[]>([]);
 	let total = $state(0);
@@ -85,6 +86,12 @@
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col">
+	<div class="mb-4 flex items-center justify-between">
+		<h2 class="text-lg font-semibold">生产单列表</h2>
+		<button type="button" class="btn btn-primary btn-sm gap-1" onclick={() => goto('/production/orders/create')}>
+			<Plus size={14} /> 新增生产单
+		</button>
+	</div>
 	<DataGrid
 		class="min-h-0 flex-1"
 		columns={columns}

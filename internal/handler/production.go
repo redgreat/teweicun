@@ -278,3 +278,25 @@ func CreateProductionReturnOrder(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"id": id})
 }
+
+// CreateProductionOrder 手动创建生产单
+func CreateProductionOrder(c *gin.Context) {
+	var req request.CreateProductionOrderReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
+		return
+	}
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.Error(c, errcode.ErrUnauthorized)
+		return
+	}
+	usernameVal, _ := c.Get("username")
+	username, _ := usernameVal.(string)
+	id, err := service.CreateProductionOrder(c.Request.Context(), req, userID, username)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Success(c, gin.H{"id": id})
+}

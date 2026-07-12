@@ -65,3 +65,7 @@ func ListProductionReturnOrdersForDropdown(ctx context.Context, keyword string) 
 func CreateProductionReturnOrder(ctx context.Context, req request.CreateProductionReturnOrderReq, userID int64, username string) (int64, error) {
 	return db.CreateProductionReturnOrder(ctx, req, userID, username)
 }
+
+func CreateProductionOrder(ctx context.Context, req request.CreateProductionOrderReq, userID int64, username string) (int64, error) {
+	return db.CreateProductionOrder(ctx, req, userID, username)
+}

@@ -578,3 +578,62 @@ func CreateProductionReturnOrder(ctx context.Context, req request.CreateProducti
 	_, _ = tx.Exec(ctx, `CALL sp_write_audit_log($1,$2,$3,$4,$5,$6,$7)`, userID, username, "CREATE", "PROD_RETURN", "production_return_order", returnID, nil)
 	return returnID, tx.Commit(ctx)
 }
+
+// CreateProductionOrder 手动创建生产单
+func CreateProductionOrder(ctx context.Context, req request.CreateProductionOrderReq, userID int64, username string) (int64, error) {
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil { return 0, err }
+	defer tx.Rollback(ctx)
+
+	var matCode, matName, matUnit string
+	err = tx.QueryRow(ctx, `SELECT material_code, material_name, COALESCE(unit,'pcs') FROM material WHERE id=$1 AND deleted_at IS NULL`,
+		req.ProducedMaterialID).Scan(&matCode, &matName, &matUnit)
+	if err != nil { return 0, fmt.Errorf("DB_ERROR: 成品物料不存在") }
+
+	var whCode, whName string
+	err = tx.QueryRow(ctx, `SELECT warehouse_code, warehouse_name FROM warehouse WHERE id=$1 AND deleted_at IS NULL`,
+		req.ProducedWarehouseID).Scan(&whCode, &whName)
+	if err != nil { return 0, fmt.Errorf("DB_ERROR: 成品仓库不存在") }
+
+	var prodNo string
+	if err = tx.QueryRow(ctx, "SELECT fn_generate_serial_no('PR')").Scan(&prodNo); err != nil { return 0, err }
+
+	unitCost := float64(0)
+	if req.ProducedQuantity > 0 && req.CostPrice > 0 {
+		unitCost = req.CostPrice / req.ProducedQuantity
+	}
+
+	// 创建入库单
+	var siNo string
+	if err = tx.QueryRow(ctx, "SELECT fn_generate_serial_no('SI')").Scan(&siNo); err != nil { return 0, err }
+	var siID int64
+	err = tx.QueryRow(ctx, `INSERT INTO stock_in (stock_in_no, warehouse_id, warehouse_code, stock_in_date, stock_in_status, stock_in_type, remark, created_by, updated_by)
+		VALUES ($1,$2,$3,CURRENT_DATE,'preparing','production','手动创建生产单',$4,$5) RETURNING id`,
+		siNo, req.ProducedWarehouseID, whCode, userID, userID).Scan(&siID)
+	if err != nil { return 0, err }
+
+	_, err = tx.Exec(ctx, `INSERT INTO stock_in_item (stock_in_id, material_id, arrived_quantity, accepted_quantity, unit, unit_cost, custom_attributes, created_at)
+		VALUES ($1,$2,$3,$4,$5,$6,'[]'::jsonb,NOW())`,
+		siID, req.ProducedMaterialID, req.ProducedQuantity, req.ProducedQuantity, matUnit, unitCost)
+	if err != nil { return 0, err }
+
+	// 确认入库
+	if _, err = tx.Exec(ctx, `CALL sp_confirm_stock_in($1,$2)`, siID, userID); err != nil {
+		return 0, fmt.Errorf("DB_ERROR: %s", err.Error())
+	}
+
+	// 创建生产单
+	var consumptionID interface{} = nil
+	if req.ConsumptionOrderID > 0 { consumptionID = req.ConsumptionOrderID }
+	var id int64
+	err = tx.QueryRow(ctx, `INSERT INTO production_order (production_no, consumption_order_id, stock_in_id,
+		produced_material_id, produced_warehouse_id, produced_quantity, produced_unit_cost, cost_price,
+		status, remark, created_by, updated_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'completed',$9,$10,$11) RETURNING id`,
+		prodNo, consumptionID, siID, req.ProducedMaterialID, req.ProducedWarehouseID,
+		req.ProducedQuantity, unitCost, req.CostPrice, req.Remark, userID, userID).Scan(&id)
+	if err != nil { return 0, err }
+
+	_, _ = tx.Exec(ctx, `CALL sp_write_audit_log($1,$2,$3,$4,$5,$6,$7)`, userID, username, "CREATE", "PRODUCTION", "production_order", id, nil)
+	return id, tx.Commit(ctx)
+}

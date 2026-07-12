@@ -1,22 +1,105 @@
-# 生产环境 Docker Compose（腾讯云 ECS 用）
-# 从 GHCR 拉取镜像 + Watchtower 每5分钟自动检查更新
+# 生产环境 Docker Compose（腾讯云 ECS）
+# PostgreSQL 17 + Redis 7 + twc + Watchtower 自动更新
 #
-# 首次部署:
-#   1. 创建 GitHub Token (read:packages 权限): https://github.com/settings/tokens
-#   2. export GITHUB_TOKEN=ghp_xxxx && bash scripts/ecs_deploy.sh
-#
-# 日常使用:
-#   查看日志: docker compose -f docker-compose-prod.yml logs -f twc
-#   手动更新: docker compose -f docker-compose-prod.yml pull twc && docker compose -f docker-compose-prod.yml up -d twc
-#   重启:     docker compose -f docker-compose-prod.yml restart twc
+# 部署: bash scripts/ecs_deploy.sh
+# 备份: docker exec twc-postgres pg_dump -U twc_pro teweicun > pgdata/backup/$(date +%Y%m%d).sql
 
 services:
+  # ────────────────────────────────────
+  # PostgreSQL 17 数据库
+  # ────────────────────────────────────
+  twc-postgres:
+    image: postgres:17-alpine
+    container_name: twc-postgres
+    restart: unless-stopped
+    hostname: twc-postgres
+
+    environment:
+      - POSTGRES_USER=twc_pro
+      - POSTGRES_PASSWORD=TwcPro2026!
+      - POSTGRES_DB=teweicun
+      - TZ=Asia/Shanghai
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+      - ./pgdata/archive:/var/lib/postgresql/archive
+      - ./pgdata/log:/var/log/postgresql
+      - ./configs/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+
+    networks:
+      - twc-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U twc_pro -d teweicun"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    shm_size: 256MB
+    mem_limit: 2G
+    cpus: 2.0
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ────────────────────────────────────
+  # Redis 7 缓存
+  # ────────────────────────────────────
+  twc-redis:
+    image: redis:7-alpine
+    container_name: twc-redis
+    restart: unless-stopped
+    hostname: twc-redis
+
+    command:
+      - redis-server
+      - --appendonly yes
+      - --save 900 1
+      - --save 300 10
+      - --save 60 10000
+      - --requirepass TwcRedis2026!
+      - --maxmemory 256mb
+      - --maxmemory-policy allkeys-lru
+      - --databases 16
+      - --tcp-keepalive 300
+      - --slowlog-log-slower-than 10000
+      - --slowlog-max-len 128
+
+    volumes:
+      - ./redisdata:/data
+
+    networks:
+      - twc-network
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "TwcRedis2026!", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+    mem_limit: 512M
+    cpus: 1.0
+
+  # ────────────────────────────────────
+  # 特维存 应用服务
+  # ────────────────────────────────────
   twc:
     image: ghcr.io/redgreat/teweicun:latest
     container_name: twc
     hostname: twc
     restart: unless-stopped
-    command: ["./main", "-c", "/app/configs/config.yaml"]
+    command: ["./main", "-c", "/app/configs/config.prod.yaml"]
 
     environment:
       - TZ=Asia/Shanghai
@@ -26,27 +109,31 @@ services:
       - "8080:8080"
 
     volumes:
-      - ./configs:/app/configs:ro        # 配置文件
-      - ./uploads:/app/uploads            # 上传文件
-      - ./logs:/var/log/teweicun          # 日志
+      - ./configs:/app/configs:ro
+      - ./uploads:/app/uploads
+      - ./logs:/var/log/teweicun
 
     networks:
       - twc-network
+
+    depends_on:
+      twc-postgres:
+        condition: service_healthy
+      twc-redis:
+        condition: service_healthy
 
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/v1/health || exit 1"]
       interval: 60s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 20s
 
-    # Watchtower 通过标签识别需要自动更新的容器
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
     cpus: 2.0
-    mem_limit: 4G
-    mem_reservation: 512m
+    mem_limit: 2G
 
     logging:
       driver: "json-file"
@@ -54,19 +141,20 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  # Watchtower: 每5分钟检查 GHCR，发现新镜像自动更新 twc 容器
+  # ────────────────────────────────────
+  # Watchtower 自动更新
+  # ────────────────────────────────────
   watchtower:
     image: containrrr/watchtower:latest
     container_name: twc-watchtower
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /root/.docker/config.json:/config.json:ro   # 复用 GHCR 登录凭证
+      - /root/.docker/config.json:/config.json:ro
     command:
-      - --interval=300           # 每5分钟检查一次
-      - --cleanup                # 自动清理旧镜像
-      - --include-restarting     # 包含重启中的容器
-      - twc                      # 只监控 twc 容器
+      - --interval=300
+      - --cleanup
+      - twc
     environment:
       - TZ=Asia/Shanghai
     networks:

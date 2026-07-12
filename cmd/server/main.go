@@ -266,6 +266,7 @@ func main() {
 			// Production Routes (生产单/生产退货单)
 			protected.GET("/production/orders", handler.ListProductionOrders)
 			// 下拉列表必须在 :id 之前注册
+			protected.POST("/production/orders", handler.CreateProductionOrder)
 			protected.GET("/production/orders/dropdown", handler.ListProductionOrdersForDropdown)
 			protected.GET("/production/orders/:id", handler.GetProductionOrderDetail)
 			protected.PUT("/production/orders/:id", handler.UpdateProductionOrder)
