@@ -12,7 +12,7 @@
 	import api from '$lib/api/client';
 	import { toast } from '$lib/store/toast';
 	import { formatDateInCn } from '$lib/datetime';
-	import { Plus } from 'lucide-svelte';
+	import { Plus, Pencil, Eye } from 'lucide-svelte';
 
 	let rows = $state<any[]>([]);
 	let total = $state(0);
@@ -26,23 +26,24 @@
 	});
 
 	const columns = [
-		{ key: 'production_no', label: '生产单号', class: 'font-mono text-primary', width: '16%' },
-		{ key: 'consumption_order_no', label: '领料单号', class: 'font-mono', width: '16%' },
-		{ key: 'stock_in_no', label: '入库单号', class: 'font-mono', width: '16%' },
+		{ key: 'production_no', label: '生产单号', class: 'font-mono text-primary', width: '14%' },
+		{ key: 'consumption_order_no', label: '领料单号', class: 'font-mono', width: '14%' },
 		{ key: 'produced_material_name', label: '成品物料', width: '18%' },
-		{ key: 'produced_quantity', label: '数量', class: 'font-mono text-right pr-6', width: '10%' },
+		{ key: 'produced_quantity', label: '数量', class: 'font-mono text-right pr-5', width: '8%' },
+		{ key: 'cost_price', label: '成本', class: 'font-mono text-right pr-5', width: '10%' },
 		{ key: 'status', label: '状态', width: '10%' },
-		{ key: 'created_at', label: '创建时间', width: '14%', class: 'text-center' }
+		{ key: 'created_at', label: '创建时间', width: '12%' },
+		{ key: 'actions', label: '操作', width: '14%', class: 'text-center' }
 	];
 
-	function statusName(v: string) {
-		const map: any = { completed: '已完成' };
+	function statusName(v: string, row: any) {
+		if (row?.status_name) return row.status_name;
+		const map: any = { completed: '已完成', confirmed: '已确认', created: '待处理', cancelled: '已取消' };
 		return map[v] || v || '-';
 	}
 
-	function navigateToDetail(id: number) {
-		goto(`/production/orders/${id}`);
-	}
+	function navigateToDetail(id: number) { goto(`/production/orders/${id}`); }
+	function navigateToEdit(id: number) { goto(`/production/orders/${id}/edit`); }
 
 	function fmtDate(v: string) {
 		if (!v) return '-';
@@ -64,25 +65,13 @@
 		} catch (e) {
 			console.error(e);
 			toast.error('加载生产单列表失败');
-		} finally {
-			loading = false;
-		}
+		} finally { loading = false; }
 	}
 
-	function handleFilterSearch() {
-		currentPage = 1;
-		loadData(1);
-	}
+	function handleFilterSearch() { currentPage = 1; loadData(1); }
+	function resetFilters() { filters = { production_no: '', status: '' }; currentPage = 1; loadData(1); }
 
-	function resetFilters() {
-		filters = { production_no: '', status: '' };
-		currentPage = 1;
-		loadData(1);
-	}
-
-	onMount(() => {
-		loadData(1);
-	});
+	onMount(() => { loadData(1); });
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col">
@@ -103,30 +92,21 @@
 		onPageChange={loadData}
 		showDefaultSearch={false}
 		showActions={false}
-		onExport={() => {}}
 	>
 		{#snippet headerFilters()}
 			<div class="scrollbar-hide flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto py-0.5">
-				<input
-					type="text"
+				<input type="text"
 					class="input bg-base-200 focus:bg-base-100 h-10 min-h-10 w-[12rem] shrink-0 rounded-lg border-none px-3 text-base"
-					placeholder="生产单号"
-					bind:value={filters.production_no}
-					onkeydown={(e) => e.key === 'Enter' && handleFilterSearch()}
-				/>
-				<select
-					class="select bg-base-200 focus:bg-base-100 h-10 min-h-10 w-[10rem] shrink-0 rounded-lg border-none py-0 pr-8 pl-2 text-base leading-tight"
-					bind:value={filters.status}
-				>
+					placeholder="生产单号" bind:value={filters.production_no}
+					onkeydown={(e) => e.key === 'Enter' && handleFilterSearch()} />
+				<select class="select bg-base-200 focus:bg-base-100 h-10 min-h-10 w-[10rem] shrink-0 rounded-lg border-none"
+					bind:value={filters.status}>
 					<option value="">状态</option>
 					<option value="completed">已完成</option>
+					<option value="created">待处理</option>
 				</select>
-				<button type="button" class="btn btn-ghost h-10 min-h-10 rounded-lg" onclick={handleFilterSearch}>
-					查询
-				</button>
-				<button type="button" class="btn btn-ghost h-10 min-h-10 rounded-lg" onclick={resetFilters}>
-					重置
-				</button>
+				<button type="button" class="btn btn-ghost h-10 min-h-10 rounded-lg" onclick={handleFilterSearch}>查询</button>
+				<button type="button" class="btn btn-ghost h-10 min-h-10 rounded-lg" onclick={resetFilters}>重置</button>
 			</div>
 		{/snippet}
 
@@ -139,22 +119,23 @@
 				{:else}
 					<span class="text-base-content/30">-</span>
 				{/if}
-			{:else if key === 'stock_in_no'}
-				{#if row.stock_in_id}
-					<CopyableNo value={value} href={`/stock/in/${row.stock_in_id}`} />
-				{:else}
-					<span class="text-base-content/30">-</span>
-				{/if}
 			{:else if key === 'produced_material_name'}
-				<span class="block truncate" title={value || '-'}>
-					{value || '-'}
-				</span>
+				<span class="block truncate" title={value || '-'}>{value || '-'}</span>
 			{:else if key === 'produced_quantity'}
 				{Number(value || 0).toFixed(3)}
+			{:else if key === 'cost_price'}
+				¥{Number(value || 0).toFixed(2)}
 			{:else if key === 'status'}
-				<span class="badge badge-success badge-md">{statusName(value)}</span>
+				<span class="badge badge-success badge-md">{statusName(value, row)}</span>
 			{:else if key === 'created_at'}
 				{fmtDate(value)}
+			{:else if key === 'actions'}
+				<div class="flex items-center justify-center gap-1">
+					<button type="button" class="btn btn-ghost btn-xs" onclick={() => navigateToDetail(row.id)}
+						title="详情"><Eye size={14} /></button>
+					<button type="button" class="btn btn-ghost btn-xs" onclick={() => navigateToEdit(row.id)}
+						title="编辑"><Pencil size={14} /></button>
+				</div>
 			{:else}
 				{value ?? '-'}
 			{/if}
