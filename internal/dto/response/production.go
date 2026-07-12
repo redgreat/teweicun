@@ -11,7 +11,8 @@ import "time"
 type ProductionOrderResp struct {
 	ID                   int64     `json:"id"`
 	ProductionNo         string    `json:"production_no"`
-	Status               string    `json:"status"`
+	Status                 string    `json:"status"`
+	StatusName             string    `json:"status_name,omitempty"`
 	ConsumptionOrderID   int64     `json:"consumption_order_id"`
 	ConsumptionOrderNo   string    `json:"consumption_order_no"`
 	StockOutID           int64     `json:"stock_out_id"`
@@ -42,7 +43,8 @@ type ProductionOrderListResp struct {
 type ProductionReturnOrderResp struct {
 	ID                    int64     `json:"id"`
 	ReturnNo              string    `json:"return_no"`
-	Status                string    `json:"status"`
+	Status                 string    `json:"status"`
+	StatusName             string    `json:"status_name,omitempty"`
 	ProductionOrderID      int64     `json:"production_order_id"`
 	ProductionNo           string    `json:"production_no"`
 	ConsumptionOrderID     int64     `json:"consumption_order_id"`

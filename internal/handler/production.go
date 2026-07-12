@@ -256,3 +256,25 @@ func ListProductionReturnOrdersForDropdown(c *gin.Context) {
 	}
 	response.Success(c, out)
 }
+
+// CreateProductionReturnOrder 创建生产退货单（成品退回，出库减少库存）
+func CreateProductionReturnOrder(c *gin.Context) {
+	var req request.CreateProductionReturnOrderReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, errcode.NewAppError(errcode.ErrInvalidParam.Code, err.Error(), errcode.ErrInvalidParam.HTTPCode))
+		return
+	}
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.Error(c, errcode.ErrUnauthorized)
+		return
+	}
+	usernameVal, _ := c.Get("username")
+	username, _ := usernameVal.(string)
+	id, err := service.CreateProductionReturnOrder(c.Request.Context(), req, userID, username)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Success(c, gin.H{"id": id})
+}

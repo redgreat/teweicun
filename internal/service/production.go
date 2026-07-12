@@ -61,3 +61,7 @@ func ListProductionOrdersForDropdown(ctx context.Context, keyword string) ([]map
 func ListProductionReturnOrdersForDropdown(ctx context.Context, keyword string) ([]map[string]interface{}, error) {
 	return db.ListProductionReturnOrdersForDropdown(ctx, keyword)
 }
+
+func CreateProductionReturnOrder(ctx context.Context, req request.CreateProductionReturnOrderReq, userID int64, username string) (int64, error) {
+	return db.CreateProductionReturnOrder(ctx, req, userID, username)
+}

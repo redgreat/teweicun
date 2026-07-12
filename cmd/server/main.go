@@ -273,6 +273,7 @@ func main() {
 			protected.GET("/production/orders/:id/reversal-orders", handler.ListReversalOrdersByProduction)
 			protected.GET("/production/returns", handler.ListProductionReturnOrders)
 			// 下拉列表必须在 :id 之前注册
+			protected.POST("/production/returns", handler.CreateProductionReturnOrder)
 			protected.GET("/production/returns/dropdown", handler.ListProductionReturnOrdersForDropdown)
 			protected.GET("/production/returns/:id", handler.GetProductionReturnOrderDetail)
 			protected.PUT("/production/returns/:id", handler.UpdateProductionReturnOrder)

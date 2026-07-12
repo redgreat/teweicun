@@ -1,0 +1,77 @@
+# 生产环境 Docker Compose（腾讯云 ECS 用）
+# 从 GHCR 拉取镜像 + Watchtower 每5分钟自动检查更新
+#
+# 首次部署:
+#   1. 创建 GitHub Token (read:packages 权限): https://github.com/settings/tokens
+#   2. export GITHUB_TOKEN=ghp_xxxx && bash scripts/ecs_deploy.sh
+#
+# 日常使用:
+#   查看日志: docker compose -f docker-compose-prod.yml logs -f twc
+#   手动更新: docker compose -f docker-compose-prod.yml pull twc && docker compose -f docker-compose-prod.yml up -d twc
+#   重启:     docker compose -f docker-compose-prod.yml restart twc
+
+services:
+  twc:
+    image: ghcr.io/redgreat/teweicun:latest
+    container_name: twc
+    hostname: twc
+    restart: unless-stopped
+    command: ["./main", "-c", "/app/configs/config.yaml"]
+
+    environment:
+      - TZ=Asia/Shanghai
+      - LANG=zh_CN.UTF-8
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+      - ./configs:/app/configs:ro        # 配置文件
+      - ./uploads:/app/uploads            # 上传文件
+      - ./logs:/var/log/teweicun          # 日志
+
+    networks:
+      - twc-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/v1/health || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    # Watchtower 通过标签识别需要自动更新的容器
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+    cpus: 2.0
+    mem_limit: 4G
+    mem_reservation: 512m
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # Watchtower: 每5分钟检查 GHCR，发现新镜像自动更新 twc 容器
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: twc-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json:ro   # 复用 GHCR 登录凭证
+    command:
+      - --interval=300           # 每5分钟检查一次
+      - --cleanup                # 自动清理旧镜像
+      - --include-restarting     # 包含重启中的容器
+      - twc                      # 只监控 twc 容器
+    environment:
+      - TZ=Asia/Shanghai
+    networks:
+      - twc-network
+
+networks:
+  twc-network:
+    driver: bridge

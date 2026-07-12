@@ -30,3 +30,10 @@ type ProductionReturnOrderUpdate struct {
 	Remark    string  `json:"remark" binding:"omitempty,max=500"`
 }
 
+// CreateProductionReturnOrderReq 创建生产退货单
+type CreateProductionReturnOrderReq struct {
+	ProductionOrderID int64   `json:"production_order_id" binding:"required"`
+	ReturnedQuantity  float64 `json:"returned_quantity" binding:"required,gt=0"`
+	Remark            string  `json:"remark" binding:"omitempty,max=500"`
+}
+

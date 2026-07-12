@@ -10,9 +10,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/redgreat/teweicun/internal/dto/request"
 	"github.com/redgreat/teweicun/internal/dto/response"
+	"github.com/redgreat/teweicun/internal/pkg/errcode"
 	"github.com/redgreat/teweicun/pkg/database"
 )
 
@@ -192,6 +195,7 @@ func ListProductionReturnOrders(ctx context.Context, q request.ProductionReturnO
 		); err != nil {
 			return nil, err
 		}
+		r.StatusName = productionReturnStatusName(r.Status)
 		out = append(out, r)
 	}
 	if err := rows.Err(); err != nil {
@@ -235,6 +239,7 @@ func GetProductionReturnOrderDetail(ctx context.Context, id int64) (*response.Pr
 	); err != nil {
 		return nil, err
 	}
+	r.StatusName = productionReturnStatusName(r.Status)
 	return &r, nil
 }
 
@@ -522,4 +527,54 @@ func ListProductionReturnOrdersForDropdown(ctx context.Context, keyword string) 
 		})
 	}
 	return out, rows.Err()
+}
+
+// productionReturnStatusName 生产退货单状态中文映射
+func productionReturnStatusName(status string) string {
+	switch status {
+	case "created": return "待处理"
+	case "confirmed": return "已确认"
+	case "cancelled": return "已取消"
+	default: return status
+	}
+}
+
+// CreateProductionReturnOrder 创建生产退货单
+func CreateProductionReturnOrder(ctx context.Context, req request.CreateProductionReturnOrderReq, userID int64, username string) (int64, error) {
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil { return 0, err }
+	defer tx.Rollback(ctx)
+
+	var po struct {
+		productionNo string; consumptionOrderID int64; producedMaterialID int64
+		producedWarehouseID int64; producedQuantity float64; producedUnitCost float64
+	}
+	err = tx.QueryRow(ctx, `SELECT production_no, consumption_order_id, produced_material_id, produced_warehouse_id, produced_quantity, produced_unit_cost FROM production_order WHERE id = $1 FOR UPDATE`, req.ProductionOrderID).Scan(&po.productionNo, &po.consumptionOrderID, &po.producedMaterialID, &po.producedWarehouseID, &po.producedQuantity, &po.producedUnitCost)
+	if err != nil {
+		if err == pgx.ErrNoRows { return 0, errcode.NewAppError(errcode.ErrNotFound.Code, "生产单不存在", errcode.ErrNotFound.HTTPCode) }
+		return 0, err
+	}
+	if req.ReturnedQuantity > po.producedQuantity {
+		return 0, errcode.NewAppError(errcode.ErrInvalidParam.Code, fmt.Sprintf("DB_ERROR: 退货数量(%.3f)不能超过生产数量(%.3f)", req.ReturnedQuantity, po.producedQuantity), errcode.ErrInvalidParam.HTTPCode)
+	}
+
+	var returnNo string
+	if err = tx.QueryRow(ctx, "SELECT fn_generate_serial_no('PRR')").Scan(&returnNo); err != nil { return 0, err }
+
+	var stockOutID int64
+	if err = tx.QueryRow(ctx, `INSERT INTO stock_out (stock_out_no, stock_out_date, out_type, ref_doc_type, status, remark, created_by, updated_by) VALUES ($1, CURRENT_DATE, 'production_return', 'production_return', 'draft', '生产退货-成品退回', $2, $3) RETURNING id`, "SO"+time.Now().Format("20060102150405"), userID, userID).Scan(&stockOutID); err != nil { return 0, err }
+
+	var invID int64
+	err = tx.QueryRow(ctx, `SELECT i.id FROM inventory i WHERE i.material_id = $1 AND i.warehouse_id = $2 AND i.quantity > 0 ORDER BY i.id LIMIT 1 FOR UPDATE`, po.producedMaterialID, po.producedWarehouseID).Scan(&invID)
+	if err != nil { return 0, fmt.Errorf("DB_ERROR: 成品库存不足") }
+
+	if _, err = tx.Exec(ctx, `INSERT INTO stock_out_item (stock_out_id, material_id, inventory_id, quantity, unit, remark) SELECT $1, $2, $3, $4, COALESCE(m.unit,'pcs'), '生产退货' FROM material m WHERE m.id=$2`, stockOutID, po.producedMaterialID, invID, req.ReturnedQuantity); err != nil { return 0, err }
+	if _, err = tx.Exec(ctx, `CALL sp_confirm_stock_out($1, $2)`, stockOutID, userID); err != nil { return 0, fmt.Errorf("DB_ERROR: %s", err.Error()) }
+
+	var returnID int64
+	err = tx.QueryRow(ctx, `INSERT INTO production_return_order (return_no, production_order_id, stock_out_id, returned_quantity, status, remark, created_by, updated_by) VALUES ($1, $2, $3, $4, 'confirmed', $5, $6, $7) RETURNING id`, returnNo, req.ProductionOrderID, stockOutID, req.ReturnedQuantity, req.Remark, userID, userID).Scan(&returnID)
+	if err != nil { return 0, err }
+
+	_, _ = tx.Exec(ctx, `CALL sp_write_audit_log($1,$2,$3,$4,$5,$6,$7)`, userID, username, "CREATE", "PROD_RETURN", "production_return_order", returnID, nil)
+	return returnID, tx.Commit(ctx)
 }

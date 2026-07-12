@@ -12,21 +12,6 @@ BASE_URL="${TWC_BASE_URL:-http://localhost:8080}"
 ADMIN_USER="${TWC_ADMIN_USER:-admin}"
 ADMIN_PASS="${TWC_ADMIN_PASS:-admin123}"
 
-<<<<<<< Updated upstream
-assert_success() {
-  local response="$1"
-  local step="$2"
-  local code
-  code=$(echo "$response" | jq -r '.code // "missing"')
-  if [ "$code" != "0" ]; then
-    echo "✗ $step 失败"
-    echo "响应: $response"
-    exit 1
-  fi
-}
-
-echo "=== 采购订单API测试 ==="
-=======
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 PASS=0; FAIL=0
 pass() { echo -e "${GREEN}[PASS]${NC} $*"; PASS=$((PASS+1)); }
@@ -38,118 +23,12 @@ echo "  特维存（TeWeiCun）采购入库全流程 API 测试"
 echo "  目标: $BASE_URL"
 echo "  时间: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "================================================================"
->>>>>>> Stashed changes
 echo ""
 
 # ── 1. 登录 ──
 echo "【1/8】管理员登录"
 LOGIN=$(curl -sS -X POST "$BASE_URL/api/v1/auth/login" \
   -H "Content-Type: application/json" \
-<<<<<<< Updated upstream
-  -d '{"username":"admin","password":"admin123"}')
-assert_success "$LOGIN_RESPONSE" "登录"
-TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.data.token')
-if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-  echo "✗ 登录失败：Token为空"
-  echo "响应: $LOGIN_RESPONSE"
-  exit 1
-fi
-echo "✓ Token获取成功"
-echo ""
-
-echo "2. 创建采购订单..."
-echo "   获取一个可用物料..."
-MATERIAL_RESPONSE=$(curl -s -X GET "$BASE_URL/base/materials?page=1&page_size=1" \
-  -H "Authorization: Bearer $TOKEN")
-assert_success "$MATERIAL_RESPONSE" "获取物料"
-MATERIAL_ID=$(echo "$MATERIAL_RESPONSE" | jq -r '.data.list[0].id')
-MATERIAL_NAME=$(echo "$MATERIAL_RESPONSE" | jq -r '.data.list[0].material_name')
-if [ -z "$MATERIAL_ID" ] || [ "$MATERIAL_ID" = "null" ]; then
-  echo "✗ 未找到可用物料"
-  echo "响应: $MATERIAL_RESPONSE"
-  exit 1
-fi
-echo "✓ 物料: $MATERIAL_NAME, material_id=$MATERIAL_ID"
-echo "   获取一个可用供应商..."
-SUPPLIER_RESPONSE=$(curl -s -X GET "$BASE_URL/base/suppliers?page=1&page_size=1" \
-  -H "Authorization: Bearer $TOKEN")
-assert_success "$SUPPLIER_RESPONSE" "获取供应商"
-SUPPLIER_CODE=$(echo "$SUPPLIER_RESPONSE" | jq -r '.data.list[0].supplier_code')
-SUPPLIER_NAME=$(echo "$SUPPLIER_RESPONSE" | jq -r '.data.list[0].supplier_name')
-if [ -z "$SUPPLIER_CODE" ] || [ "$SUPPLIER_CODE" = "null" ]; then
-  echo "✗ 未找到可用供应商"
-  echo "响应: $SUPPLIER_RESPONSE"
-  exit 1
-fi
-echo "✓ 供应商: $SUPPLIER_NAME, supplier_code=$SUPPLIER_CODE"
-CREATE_RESPONSE=$(curl -s -X POST "$BASE_URL/purchase/orders" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "supplier_code": "'"$SUPPLIER_CODE"'",
-    "order_date": "2026-04-18",
-    "expected_date": "2026-04-25",
-    "remark": "API测试采购订单",
-    "items": [
-      {
-        "material_id": '"$MATERIAL_ID"',
-        "quantity": 50,
-        "unit": "件",
-        "unit_price": 100.00,
-        "remark": "行备注"
-      }
-    ]
-  }')
-assert_success "$CREATE_RESPONSE" "创建采购订单"
-ORDER_ID=$(echo "$CREATE_RESPONSE" | jq -r '.data.id')
-if [ -z "$ORDER_ID" ] || [ "$ORDER_ID" = "null" ]; then
-  echo "✗ 创建采购订单失败：ID为空"
-  echo "响应: $CREATE_RESPONSE"
-  exit 1
-fi
-echo "✓ 采购订单创建成功, ID: $ORDER_ID"
-echo ""
-
-echo "3. 查询采购订单列表..."
-LIST_RESPONSE=$(curl -s -X GET "$BASE_URL/purchase/orders?page=1&page_size=10" \
-  -H "Authorization: Bearer $TOKEN")
-assert_success "$LIST_RESPONSE" "查询采购订单列表"
-TOTAL=$(echo "$LIST_RESPONSE" | jq -r '.data.total')
-echo "✓ 查询成功, 共 $TOTAL 条记录"
-echo ""
-
-echo "4. 查询采购订单详情..."
-DETAIL_RESPONSE=$(curl -s -X GET "$BASE_URL/purchase/orders/$ORDER_ID" \
-  -H "Authorization: Bearer $TOKEN")
-assert_success "$DETAIL_RESPONSE" "查询采购订单详情"
-ORDER_NO=$(echo "$DETAIL_RESPONSE" | jq -r '.data.order_no')
-TOTAL_AMOUNT=$(echo "$DETAIL_RESPONSE" | jq -r '.data.total_amount')
-if [ -z "$ORDER_NO" ] || [ "$ORDER_NO" = "null" ]; then
-  echo "✗ 采购订单详情缺少订单号"
-  echo "响应: $DETAIL_RESPONSE"
-  exit 1
-fi
-echo "✓ 订单详情: $ORDER_NO, 总金额: ¥$TOTAL_AMOUNT"
-echo ""
-
-echo "5. 更新采购订单..."
-UPDATE_RESPONSE=$(curl -s -X PUT "$BASE_URL/purchase/orders/$ORDER_ID" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "expected_date": "2026-04-30",
-    "remark": "已更新备注"
-  }')
-assert_success "$UPDATE_RESPONSE" "更新采购订单"
-echo "✓ 采购订单更新成功"
-echo ""
-
-echo "6. 确认采购订单..."
-CONFIRM_RESPONSE=$(curl -s -X POST "$BASE_URL/purchase/orders/$ORDER_ID/confirm" \
-  -H "Authorization: Bearer $TOKEN")
-assert_success "$CONFIRM_RESPONSE" "确认采购订单"
-echo "✓ 采购订单确认成功"
-=======
   -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}")
 TOKEN=$(echo "$LOGIN" | jq -r '.data.token // empty')
 if [[ -n "$TOKEN" && "$TOKEN" != "null" ]]; then
@@ -194,12 +73,10 @@ echo ""
 echo "【4/8】查询物料（一个编码管理 + 一个非编码管理）"
 MAT_LIST=$(curl -sS "$BASE_URL/api/v1/base/materials?page=1&page_size=100" "${AUTH_GET[@]}")
 
-# 找一个编码管理物料（is_code=true）
 CODE_MAT=$(echo "$MAT_LIST" | jq '[.data.list[] | select(.is_code == true)] | first')
 CODE_MAT_ID=$(echo "$CODE_MAT" | jq -r '.id // empty')
 CODE_MAT_NAME=$(echo "$CODE_MAT" | jq -r '.material_name // empty')
 
-# 找一个非编码管理物料（is_code=false）
 NOCODE_MAT=$(echo "$MAT_LIST" | jq '[.data.list[] | select(.is_code == false)] | first')
 NOCODE_MAT_ID=$(echo "$NOCODE_MAT" | jq -r '.id // empty')
 NOCODE_MAT_NAME=$(echo "$NOCODE_MAT" | jq -r '.material_name // empty')
@@ -261,13 +138,11 @@ if [[ -n "${ORDER_ID:-}" && "$ORDER_ID" != "null" ]]; then
 else
   echo "【6/8】跳过（订单未创建）"
 fi
->>>>>>> Stashed changes
 echo ""
 
 # ── 7. 确认采购订单并验证 ──
 if [[ -n "${ORDER_ID:-}" && "$ORDER_ID" != "null" ]]; then
   echo "【7/8】确认采购订单"
-  # 先查当前状态——CreatePurchaseOrder可能已自动确认
   DETAIL_BEFORE=$(curl -sS "$BASE_URL/api/v1/purchase/orders/$ORDER_ID" "${AUTH_GET[@]}")
   CURRENT_STATUS=$(echo "$DETAIL_BEFORE" | jq -r '.data.order_status // "unknown"')
 
@@ -279,7 +154,7 @@ if [[ -n "${ORDER_ID:-}" && "$ORDER_ID" != "null" ]]; then
     if [[ "$CONFIRM_CODE" == "0" ]]; then
       sleep 0.5
       DETAIL2=$(curl -sS "$BASE_URL/api/v1/purchase/orders/$ORDER_ID" "${AUTH_GET[@]}")
-      NEW_STATUS=$(echo "$DETAIL2" | jq -r '.data.order_status // empty')
+      NEW_STATUS=$(echo "$DETAIL2" | jq -r '.data.order_status // empty"')
       pass "订单确认成功（状态: $CURRENT_STATUS → $NEW_STATUS）"
     else
       fail "确认订单失败: code=$CONFIRM_CODE msg=$CONFIRM_MSG"
@@ -296,20 +171,16 @@ echo ""
 # ── 8. 边界测试 ──
 echo "【8/8】边界测试"
 
-# 8a. 无Token访问
 HTTP_401=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/purchase/orders?page=1")
 [[ "$HTTP_401" == "401" ]] && pass "无Token访问返回401" || fail "无Token访问返回$HTTP_401（预期401）"
 
-# 8b. 无效ID
 BAD_ID=$(curl -sS "$BASE_URL/api/v1/purchase/orders/9999999" "${AUTH_GET[@]}" | jq -r '.code // 0')
 [[ "$BAD_ID" != "0" ]] && pass "无效ID查询正确返回错误（code=$BAD_ID）" || fail "无效ID查询未拒绝"
 
-# 8c. 缺失字段
 MISSING=$(curl -sS -X POST "$BASE_URL/api/v1/purchase/orders" "${AUTH[@]}" \
   -d '{"order_date":"2026-01-01"}' | jq -r '.code // 0')
 [[ "$MISSING" != "0" ]] && pass "缺失必填字段正确拒绝（code=$MISSING）" || fail "缺失必填字段未拒绝"
 
-# 8d. 不存在的供应商（预期400，不是500）
 BAD_SUPPLIER=$(curl -sS -X POST "$BASE_URL/api/v1/purchase/orders" "${AUTH[@]}" \
   -d "{
     \"supplier_code\": \"NOT_EXIST_SUP_999\",
@@ -325,7 +196,6 @@ else
   fail "不存在的供应商未拒绝"
 fi
 
-# 8e. 健康检查
 HEALTH=$(curl -sS "$BASE_URL/api/v1/health" | jq -r '.status // "fail"')
 [[ "$HEALTH" == "ok" ]] && pass "健康检查通过" || fail "健康检查失败（status=$HEALTH）"
 echo ""
