@@ -10,6 +10,7 @@
 	import api from '$lib/api/client';
 	import { auth } from '$lib/store/auth';
 	import { goto } from '$app/navigation';
+	import { APP_VERSION } from '$lib/version';
 
 	let username = $state('');
 	let password = $state('');
@@ -152,7 +153,7 @@
 						class="cursor-pointer underline-offset-4 transition-colors hover:text-slate-300 hover:underline"
 						>忘记密码?</span
 					>
-					<span class="text-slate-600">v1.0.0 Stable</span>
+					<span class="text-slate-600">{APP_VERSION}</span>
 				</div>
 			</div>
 		</div>

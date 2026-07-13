@@ -18,6 +18,7 @@
 		ReceiptText
 	} from 'lucide-svelte';
 	import { page } from '$app/state';
+	import { APP_VERSION } from '$lib/version';
 
 	let collapsed = $state(false);
 	const currentYear = new Date().getFullYear();
@@ -174,10 +175,11 @@
 				>
 					RedGreat
 				</a><br />
-				特种设备进销存管理系统
+				特种设备进销存管理系统<br />
+			<span class="text-base-content/50">{APP_VERSION}</span>
 			</p>
 		{:else}
-			<p class="text-base-content/30 text-center text-[8px]">&copy;</p>
+			<p class="text-base-content/30 text-center text-[8px]">{APP_VERSION}</p>
 		{/if}
 	</div>
 
