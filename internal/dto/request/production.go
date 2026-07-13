@@ -39,11 +39,12 @@ type CreateProductionReturnOrderReq struct {
 
 // CreateProductionOrderReq 手动创建生产单
 type CreateProductionOrderReq struct {
-	ProducedMaterialID  int64   `json:"produced_material_id" binding:"required"`
-	ProducedWarehouseID int64   `json:"produced_warehouse_id" binding:"required"`
-	ProducedQuantity    float64 `json:"produced_quantity" binding:"required,gt=0"`
-	CostPrice           float64 `json:"cost_price" binding:"omitempty,min=0"`
-	ConsumptionOrderID  int64   `json:"consumption_order_id"`   // 可选：关联领料单
-	Remark              string  `json:"remark" binding:"omitempty,max=500"`
+	ProducedMaterialID   int64   `json:"produced_material_id" binding:"required"`
+	ProducedWarehouseID  int64   `json:"produced_warehouse_id" binding:"required"`
+	ProducedQuantity     float64 `json:"produced_quantity" binding:"required,gt=0"`
+	CostPrice            float64 `json:"cost_price" binding:"omitempty,min=0"`
+	ConsumptionOrderID   int64   `json:"consumption_order_id"`    // 单个领料单（兼容旧版）
+	ConsumptionOrderIDs  []int64 `json:"consumption_order_ids"`   // 多个领料单
+	Remark               string  `json:"remark" binding:"omitempty,max=500"`
 }
 
