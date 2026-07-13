@@ -84,6 +84,7 @@ func ListProductionOrders(ctx context.Context, q request.ProductionOrderQuery) (
 		); err != nil {
 			return nil, err
 		}
+		r.StatusName = productionOrderStatusName(r.Status)
 		out = append(out, r)
 	}
 	if err := rows.Err(); err != nil {
@@ -127,6 +128,7 @@ func GetProductionOrderDetail(ctx context.Context, id int64) (*response.Producti
 	); err != nil {
 		return nil, err
 	}
+	r.StatusName = productionOrderStatusName(r.Status)
 	return &r, nil
 }
 
@@ -527,6 +529,15 @@ func ListProductionReturnOrdersForDropdown(ctx context.Context, keyword string) 
 		})
 	}
 	return out, rows.Err()
+}
+
+// productionOrderStatusName 生产单状态中文映射
+func productionOrderStatusName(status string) string {
+	switch status {
+	case "completed": return "已完成"
+	case "draft": return "待提交"
+	default: return status
+	}
 }
 
 // productionReturnStatusName 生产退货单状态中文映射
