@@ -29,7 +29,7 @@
 	onMount(async () => {
 		try {
 			const [matRes, whRes, coRes] = await Promise.all([
-				api.get('/base/materials?page=1&page_size=200'),
+				api.get('/base/materials?page=1&page_size=100'),
 				api.get('/base/warehouses?page=1&page_size=50'),
 				api.get('/consumption/orders?page=1&page_size=100')
 			]);

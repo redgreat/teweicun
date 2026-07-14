@@ -95,7 +95,7 @@ services:
   # 特维存 应用服务
   # ────────────────────────────────────
   twc:
-    image: ghcr.io/redgreat/teweicun:latest
+    image: registry.cn-hangzhou.aliyuncs.com/redgreat/teweicun:latest
     container_name: twc
     hostname: twc
     restart: unless-stopped
