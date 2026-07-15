@@ -165,21 +165,11 @@
 
 	<div class="border-base-300 border-t p-4">
 		{#if !collapsed}
-			<p class="text-base-content/30 text-center text-[10px] leading-relaxed">
-				&copy; {currentYear} 特维存 ·
-				<a
-					class="link link-hover font-semibold tracking-wide italic"
-					href="https://github.com/redgreat/TeWeiCun"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					RedGreat
-				</a><br />
-				特种设备进销存管理系统<br />
-			<span class="text-base-content/50">{APP_VERSION}</span>
+			<p class="text-base-content/40 text-center text-[11px]">
+				&copy; {currentYear} 特维存 &nbsp;·&nbsp; <span class="text-base-content/50">{APP_VERSION}</span>
 			</p>
 		{:else}
-			<p class="text-base-content/30 text-center text-[8px]">{APP_VERSION}</p>
+			<p class="text-base-content/40 text-center text-[9px]">{APP_VERSION}</p>
 		{/if}
 	</div>
 
